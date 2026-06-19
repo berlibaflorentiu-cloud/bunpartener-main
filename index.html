@@ -3202,11 +3202,6 @@
   var name      = document.getElementById('vfo-name');
   var sub       = document.getElementById('vfo-sub');
 
-  // Pre-unlock audio on first touch so iOS allows aud.play() later
-  document.addEventListener('touchstart', function unlockAud(){
-    aud.play().then(function(){ aud.pause(); aud.currentTime=0; }).catch(function(){});
-    document.removeEventListener('touchstart', unlockAud);
-  }, {once:true, passive:true});
 
   var CHARS = (function(){
     var pre = 'Un mesaj, pentru siguranța ta juridică, din partea Bu';
