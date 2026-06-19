@@ -213,6 +213,23 @@ def translate_body(htmltext, t, ro):
     repl_class('sp-list',     rev_list,  'sp.%s.list', is_html=True)
     return htmltext
 
+# Per-language text for the video overlay (tooltip, buttons, typewriter, sub-text).
+# Uses surrounding HTML/JS context to avoid hitting unrelated occurrences of the same string.
+OVERLAY_TEXT = {
+    "en": [
+        ('id="vf-tooltip">Cine suntem<',       'id="vf-tooltip">Who we are<'),
+        ('aria-label="Vezi videoclipul nostru"','aria-label="Watch our video"'),
+        ('aria-label="Închide"',               'aria-label="Close"'),
+        ('<span>Berliba și Partenerii</span>',  '<span>Berliba &amp; Partners</span>'),
+        ('<span>Birou asociat de avocați</span>','<span>Associated Law Firm</span>'),
+        ("'Un mesaj, pentru siguranța ta juridică, din partea Bu'",
+         "'A message, for your legal security, from Bu'"),
+    ],
+    # "ru": [...],
+    # "it": [...],
+    # "fr": [...],
+}
+
 # Per-language intro audio. Keys not listed here fall back to the root intro-audio.mp3.
 AUDIO_SRC = {
     "en": "intro-audio-en.mp3",
@@ -358,6 +375,10 @@ def main():
             doc = translate_body(doc, T[lang], ro)
             # absolute asset paths (page is now in a subdir)
             doc = absolutize_assets(doc)
+            # swap in per-language video overlay text if available
+            if lang in OVERLAY_TEXT:
+                for ro_str, tr_str in OVERLAY_TEXT[lang]:
+                    doc = doc.replace(ro_str, tr_str)
             # swap in per-language audio if available
             if lang in AUDIO_SRC:
                 doc = doc.replace('src="/intro-audio.mp3"',
