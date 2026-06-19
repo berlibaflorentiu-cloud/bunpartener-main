@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dosare — BuNPartener</title>
+  <meta name="description" content="Registru de dosare reprezentate de Biroul Asociat de Avocați „Berliba și Partenerii".">
+  <meta name="theme-color" content="#0d1b35">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="icon" type="image/png" media="(prefers-color-scheme: dark)" href="favicon-dark.png">
+  <link rel="icon" type="image/png" media="(prefers-color-scheme: light)" href="favicon-light.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600;1,700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+
+  <style>
+    /* Language switcher */
+    .lang-sw { display:flex; flex-direction:column; gap:3px; align-items:center; }
+    .lang-row { display:flex; gap:4px; }
+    .lang-btn { background:none; border:1px solid rgba(255,255,255,.22); border-radius:6px; color:rgba(255,255,255,.5); cursor:pointer; font-family:var(--ff-sans); font-size:11px; font-weight:600; letter-spacing:.06em; padding:5px 9px; transition:border-color .2s,color .2s,background .2s; line-height:1; }
+    .lang-btn:hover { border-color:rgba(255,255,255,.45); color:var(--white); }
+    .lang-btn.active { background:rgba(255,255,255,.1); border-color:rgba(255,255,255,.38); color:var(--white); }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #0d1b35; --navy-2: #142240; --navy-3: #1c3060;
+      --white: #fff; --light: #8a9bbf; --red: #e12d39;
+      --ff-serif: 'Cormorant Garamond', Georgia, serif;
+      --ff-sans: 'DM Sans', system-ui, sans-serif;
+      --max-w: min(1180px, 100% - 48px);
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: var(--ff-sans); color: var(--white); background: var(--navy); line-height: 1.7; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    a { text-decoration: none; color: inherit; }
+    img { max-width: 100%; display: block; }
+    .wrap { width: var(--max-w); margin-inline: auto; }
+
+    /* Top bar */
+    .ds-nav { padding: 24px 0; border-bottom: 1px solid rgba(255,255,255,.08); position: sticky; top: 0; background: rgba(13,27,53,.86); backdrop-filter: blur(8px); z-index: 5; }
+    .ds-nav .wrap { display: flex; align-items: center; justify-content: space-between; }
+    .ds-logo img { height: 40px; width: auto; display: block; }
+    .ds-back {
+      display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
+      letter-spacing: .04em; color: rgba(255,255,255,.65); transition: color .2s;
+    }
+    .ds-back:hover { color: var(--white); }
+    .ds-back svg { width: 17px; height: 17px; }
+
+    /* Header */
+    .ds-head { padding: clamp(48px, 7vw, 84px) 0 clamp(28px, 4vw, 44px); }
+    .ds-tag {
+      display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .14em;
+      text-transform: uppercase; color: rgba(255,255,255,.5);
+      border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 7px 16px; margin-bottom: 22px;
+    }
+    .ds-title { font-family: var(--ff-serif); font-size: clamp(40px, 6vw, 60px); font-weight: 600; line-height: 1.05; }
+    .ds-title em { font-style: italic; color: rgba(255,255,255,.72); }
+    .ds-sub { margin-top: 16px; font-size: 16px; color: rgba(255,255,255,.55); max-width: 580px; }
+
+    /* Grid of dosare (static, auto-filling — no carousel) */
+    .ds-g {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;
+      padding-bottom: clamp(60px, 9vw, 120px);
+    }
+    .ds-card {
+      background: var(--navy-2); border-radius: 16px; overflow: hidden;
+      display: flex; flex-direction: column;
+      border: 1px solid rgba(255,255,255,.07);
+      transition: border-color .2s, transform .2s;
+    }
+    .ds-card:hover { border-color: rgba(255,255,255,.22); transform: translateY(-3px); }
+    .ds-thumb { aspect-ratio: 16/9; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    .ds-thumb-bg { position: absolute; inset: 0; background-size: cover; background-position: center; }
+    .ds-thumb-overlay { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(8,15,32,.55) 0%, rgba(8,15,32,.2) 100%); }
+    .ds-thumb-src {
+      position: relative; z-index: 1; font-size: 10px; font-weight: 700;
+      letter-spacing: .14em; text-transform: uppercase; color: #fff;
+      background: rgba(8,15,32,.6); border: 1px solid rgba(120,160,255,.45);
+      padding: 5px 12px; border-radius: 999px; backdrop-filter: blur(2px);
+    }
+    .ds-body { padding: 22px 24px 24px; flex: 1; display: flex; flex-direction: column; gap: 10px; }
+    .ds-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .ds-src { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #6a9bff; }
+    .ds-date { font-size: 12px; color: rgba(255,255,255,.5); white-space: nowrap; }
+    .ds-cardtitle { font-family: var(--ff-serif); font-size: 19px; font-weight: 600; color: var(--white); line-height: 1.3; }
+    .ds-excerpt { font-size: 13.5px; color: rgba(255,255,255,.55); line-height: 1.65; flex: 1; }
+    .ds-cta {
+      display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
+      font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+      color: rgba(255,255,255,.45); transition: color .2s;
+    }
+    .ds-card:hover .ds-cta { color: var(--white); }
+    .ds-cta svg { transition: transform .2s; }
+    .ds-card:hover .ds-cta svg { transform: translate(2px,-2px); }
+    /* ── Accessibility ───────────────────────────────── */
+    .skip-link{position:fixed;left:12px;top:-64px;z-index:3000;background:#fff;color:#0d1b35;padding:10px 18px;border-radius:8px;font-family:'DM Sans',system-ui,sans-serif;font-size:14px;font-weight:600;text-decoration:none;box-shadow:0 6px 20px rgba(0,0,0,.25);transition:top .18s ease;}
+    .skip-link:focus{top:12px;}
+    :focus-visible{outline:2px solid #3b6ef6;outline-offset:2px;}
+  </style>
+  <!-- i18n-seo:start -->
+  <link rel="alternate" hreflang="ro" href="https://bunpartener.md/dosare.html">
+  <link rel="alternate" hreflang="en" href="https://bunpartener.md/en/dosare.html">
+  <link rel="alternate" hreflang="ru" href="https://bunpartener.md/ru/dosare.html">
+  <link rel="alternate" hreflang="it" href="https://bunpartener.md/it/dosare.html">
+  <link rel="alternate" hreflang="fr" href="https://bunpartener.md/fr/dosare.html">
+  <link rel="alternate" hreflang="x-default" href="https://bunpartener.md/dosare.html">
+  <!-- i18n-seo:end -->
+</head>
+<body>
+<a class="skip-link" href="#main-content" data-i18n="nav.skip">Sari la conținut</a>
+
+  <nav class="ds-nav">
+    <div class="wrap">
+      <a class="ds-logo" href="index.html" aria-label="BuNPartener — acasă">
+        <img src="logoonly_transparent.png" alt="BuNPartener">
+      </a>
+      <a class="ds-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        <span data-i18n="nav.back">Înapoi la site</span>
+      </a>
+      <div class="lang-sw" role="group" aria-label="Limbă / Language">
+        <div class="lang-row">
+          <button class="lang-btn" data-lang="ro">RO</button>
+          <button class="lang-btn" data-lang="en">EN</button>
+          <button class="lang-btn" data-lang="ru">RU</button>
+        </div>
+        <div class="lang-row">
+          <button class="lang-btn" data-lang="it">IT</button>
+          <button class="lang-btn" data-lang="fr">FR</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <header class="ds-head">
+    <div class="wrap">
+      <span class="ds-tag" data-i18n="ds.tag">Registru de dosare</span>
+      <h1 class="ds-title" data-i18n-html="ds.title">Dosare <em>reprezentate</em></h1>
+      <p class="ds-sub" data-i18n="ds.sub">Selecție de cauze instrumentate de avocații biroului, cu acces la deciziile și sentințele publicate de instanțele de judecată.</p>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <div class="wrap">
+      <div class="ds-g">
+        <!-- 1 · 21 mai 2026 · CA Centru -->
+        <a class="ds-card" href="https://cac.instante.justice.md/ro/pigd_integration/pdf/MTJjNjU4NWItMGYxMi00ZmJhLWIxMjAtMGQ0M2UxMDI3ZTM1" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea de Apel Centru</span>
+              <span class="ds-date">21 mai 2026</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 1a-547/25 — Curtea de Apel Centru</h3>
+            <p class="ds-excerpt">Decizia Colegiului Penal al Curții de Apel Centru din 21 mai 2026, cauză penală în care apărarea a fost asigurată de avocații biroului.</p>
+            <span class="ds-cta">Vezi decizia <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 2 · 21 apr. 2026 · J. Bălți -->
+        <a class="ds-card" href="https://jbl.instante.justice.md/ro/pigd_integration/pdf/MDljYTk1NWUtOGIxMS00YjU3LTgzZTEtYmIzZDA0M2JiODAw" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1505664194779-8beaceb93744?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Judecătoria Bălți</span>
+              <span class="ds-date">21 apr. 2026</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 21ji-228/2025 — Judecătoria Bălți</h3>
+            <p class="ds-excerpt">Încheiere din 21 aprilie 2026, pronunțată de Judecătoria Bălți (sediul Central) în procedura de judecată de instrucție, cu participarea avocatului Viorel Berliba.</p>
+            <span class="ds-cta">Vezi încheierea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 3 · 12 mar. 2026 · CtEDO -->
+        <a class="ds-card" href="https://hudoc.echr.coe.int/fre?i=001-249631" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">hudoc.echr.coe.int</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea Europeană a Drepturilor Omului</span>
+              <span class="ds-date">12 mar. 2026</span>
+            </div>
+            <h3 class="ds-cardtitle">Ialamov v. Republica Moldova — Cererea nr. 6111/19 — CtEDO</h3>
+            <p class="ds-excerpt">Decizie pronunțată de Curtea Europeană a Drepturilor Omului la 12 martie 2026 în cauza Ialamov v. Republica Moldova, cererea radiată de pe rol.</p>
+            <span class="ds-cta">Vezi decizia <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 4 · 27 feb. 2026 · J. Chișinău Ciocana -->
+        <a class="ds-card" href="https://jc.instante.justice.md/ro/pigd_integration/pdf/ZGI2NjkwOGUtNjc2Yy00YWU5LWIzYTMtYzM4N2Y4NTJhZDEw" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Judecătoria Chișinău</span>
+              <span class="ds-date">27 feb. 2026</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 21ji-2446/2025 — Judecătoria Chișinău</h3>
+            <p class="ds-excerpt">Încheiere din 27 februarie 2026, pronunțată de Judecătoria Chișinău (sediul Ciocana) în procedura de executare a pedepsei, cu participarea avocatului Viorel Berliba.</p>
+            <span class="ds-cta">Vezi încheierea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 5 · 31 dec. 2025 · J. Chișinău Ciocana -->
+        <a class="ds-card" href="https://jc.instante.justice.md/ro/pigd_integration/pdf/ZTBkOGUyZDItZjNlZi00NjY3LThiNGEtNWE5OTNlYzQ5N2Vk" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Judecătoria Chișinău</span>
+              <span class="ds-date">31 dec. 2025</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 21ji-2431/2025 — Judecătoria Chișinău</h3>
+            <p class="ds-excerpt">Încheiere din 31 decembrie 2025, pronunțată de Judecătoria Chișinău (sediul Ciocana) în cauza condamnatului Grecu Vadim, cu participarea avocatului Viorel Berliba.</p>
+            <span class="ds-cta">Vezi încheierea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 6 · 18 aug. 2025 · J. Chișinău -->
+        <a class="ds-card" href="https://jc.instante.justice.md/ro/pigd_integration/pdf/OTIxY2FmMTYtNzQ1Ni00ZGQ3LTg4MzUtYzYyMjRiM2I3ZjIy" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1423592707957-3b212afa6733?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Judecătoria Chișinău</span>
+              <span class="ds-date">18 aug. 2025</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar penal nr. 1-1706/2022 — Judecătoria Chișinău</h3>
+            <p class="ds-excerpt">Sentință din 18 august 2025, pronunțată de Judecătoria Chișinău (sediul Buiucani) într-o cauză penală.</p>
+            <span class="ds-cta">Vezi sentința <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 7 · 11 aug. 2025 · J. Chișinău Ciocana -->
+        <a class="ds-card" href="https://jc.instante.justice.md/ro/pigd_integration/pdf/NDQ3YWRiY2MtZjM3My00NzljLWI0NDMtMGVlYmU1ZjQyMzJj" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Judecătoria Chișinău</span>
+              <span class="ds-date">11 aug. 2025</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 21ji-718/2025 — Judecătoria Chișinău</h3>
+            <p class="ds-excerpt">Încheiere din 11 august 2025, pronunțată de Judecătoria Chișinău (sediul Ciocana) în procedura de executare a pedepsei, cu participarea avocatului Lilian Osoianu.</p>
+            <span class="ds-cta">Vezi încheierea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 8 · 6 aug. 2025 · J. Chișinău Ciocana -->
+        <a class="ds-card" href="https://jc.instante.justice.md/ro/pigd_integration/pdf/MGQ5ZDkxODItYjc2Ny00NjE0LTlmOTctNzhmNDJkNWZiMzNm" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1505664194779-8beaceb93744?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Judecătoria Chișinău</span>
+              <span class="ds-date">6 aug. 2025</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 21ji-404/2025 — Judecătoria Chișinău</h3>
+            <p class="ds-excerpt">Încheiere din 6 august 2025, pronunțată de Judecătoria Chișinău (sediul Ciocana) în procedura de executare a pedepsei privative de libertate.</p>
+            <span class="ds-cta">Vezi încheierea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 9 · 2 iul. 2025 · J. Chișinău Ciocana -->
+        <a class="ds-card" href="https://jc.instante.justice.md/ro/pigd_integration/pdf/Y2VmYjUwZjktZjFlYS00ZjE5LTk0NGUtZjk2OTdiNWRiMzNh" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Judecătoria Chișinău</span>
+              <span class="ds-date">2 iul. 2025</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 21ji-3084/2024 — Judecătoria Chișinău</h3>
+            <p class="ds-excerpt">Încheiere din 2 iulie 2025, pronunțată de Judecătoria Chișinău (sediul Ciocana) asupra plângerii avocatului Viorel Berliba în interesele condamnatului Grecu Vadim.</p>
+            <span class="ds-cta">Vezi încheierea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 10 · 3 apr. 2025 · CtEDO -->
+        <a class="ds-card" href="https://agent.gov.md/wp-content/uploads/2025/07/hotararea-Berliba-v.-MDA-traducere-RO.pdf" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">agent.gov.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea Europeană a Drepturilor Omului</span>
+              <span class="ds-date">3 apr. 2025</span>
+            </div>
+            <h3 class="ds-cardtitle">Berliba v. Republica Moldova — Cererea nr. 7408/23 — CtEDO</h3>
+            <p class="ds-excerpt">Hotărâre definitivă pronunțată de Secția a Cincea a Curții Europene a Drepturilor Omului la 3 aprilie 2025, în cauza Berliba v. Republica Moldova.</p>
+            <span class="ds-cta">Vezi hotărârea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 11 · 12 feb. 2025 · J. Chișinău Râșcani -->
+        <a class="ds-card" href="https://jc.instante.justice.md/ro/pigd_integration/pdf/Mzc2YWQzOTktOTUzZS00Mjc0LWE0YmQtNzQwZjE1YTliZWMz" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Judecătoria Chișinău</span>
+              <span class="ds-date">12 feb. 2025</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 3-1448/2023 — Judecătoria Chișinău</h3>
+            <p class="ds-excerpt">Hotărâre din 12 februarie 2025, pronunțată de Judecătoria Chișinău (sediul Râșcani) în cauza de contencios administrativ privind anularea unui act administrativ individual defavorabil.</p>
+            <span class="ds-cta">Vezi hotărârea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 12 · 16 ian. 2025 · CtEDO -->
+        <a class="ds-card" href="Dosare3.pdf" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">hudoc.echr.coe.int</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea Europeană a Drepturilor Omului</span>
+              <span class="ds-date">16 ian. 2025</span>
+            </div>
+            <h3 class="ds-cardtitle">Balcan și Romașcu v. Republica Moldova — Cererile nr. 61276/15 și 60448/17 — CtEDO</h3>
+            <p class="ds-excerpt">Hotărâre pronunțată de Curtea Europeană a Drepturilor Omului la 16 ianuarie 2025, constatând încălcarea art. 6 § 1, 13 din Convenție și a art. 1 din Protocolul nr. 1, în cauza privind neexecutarea hotărârilor judecătorești interne.</p>
+            <span class="ds-cta">Vezi hotărârea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 13 · 13 dec. 2024 · J. Chișinău Buiucani -->
+        <a class="ds-card" href="https://jc.instante.justice.md/ro/pigd_integration/pdf/M2VlOTI2YWYtZDdhNi00NGE1LWFiMDEtOTJlNzMzZTMzM2Nk" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1423592707957-3b212afa6733?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Judecătoria Chișinău</span>
+              <span class="ds-date">13 dec. 2024</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 21-213/2023 — Judecătoria Chișinău</h3>
+            <p class="ds-excerpt">Încheiere din 13 decembrie 2024, pronunțată de Judecătoria Chișinău (sediul Buiucani) asupra cererii de reîncadrare juridică a faptei, depusă prin avocatul Viorel Berliba.</p>
+            <span class="ds-cta">Vezi încheierea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 14 · 14 nov. 2024 · J. Chișinău Ciocana -->
+        <a class="ds-card" href="https://jc.instante.justice.md/ro/pigd_integration/pdf/ZjY4YjNiMjEtOGYzNC00MzcyLTkyZDQtODcwNGM3MjI2NGQ5" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Judecătoria Chișinău</span>
+              <span class="ds-date">14 nov. 2024</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 21ji-2079/2024 — Judecătoria Chișinău</h3>
+            <p class="ds-excerpt">Încheiere din 14 noiembrie 2024, pronunțată de Judecătoria Chișinău (sediul Ciocana) în procedura de executare a pedepsei privative de libertate.</p>
+            <span class="ds-cta">Vezi încheierea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 15 · 6 nov. 2024 · CA Bălți -->
+        <a class="ds-card" href="https://cab.instante.justice.md/ro/pigd_integration/pdf/ZDQ5YmE0ZmMtNDAwYi00MWQ1LWI3NDgtNTg5ZGNjZTQ3NmJl" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1505664194779-8beaceb93744?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea de Apel Bălți</span>
+              <span class="ds-date">6 nov. 2024</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 1a-1008/22 — Curtea de Apel Bălți</h3>
+            <p class="ds-excerpt">Decizia Colegiului Penal al Curții de Apel Bălți din 6 noiembrie 2024, cu origine în Judecătoria Bălți (sediul Central), cauză penală cu asigurarea apărării de avocații biroului.</p>
+            <span class="ds-cta">Vezi decizia <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 16 · 7 mai 2024 · J. Chișinău -->
+        <a class="ds-card" href="https://jc.instante.justice.md/ro/pigd_integration/pdf/NGYxZmUyMDQtOWUzOC00Njc3LWE0MjgtOGVhY2Q5YTExMjRh" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Judecătoria Chișinău</span>
+              <span class="ds-date">7 mai 2024</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 1-209/2019 — Judecătoria Chișinău</h3>
+            <p class="ds-excerpt">Sentință din 7 mai 2024 într-o cauză penală privind infracțiuni de ordin economic (art. 243 Cod penal), examinată la sediul Buiucani.</p>
+            <span class="ds-cta">Vezi sentința <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 17 · 18 ian. 2024 · CtEDO -->
+        <a class="ds-card" href="Dosare5.pdf" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">hudoc.echr.coe.int</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea Europeană a Drepturilor Omului</span>
+              <span class="ds-date">18 ian. 2024</span>
+            </div>
+            <h3 class="ds-cardtitle">Mereacre și alții v. Republica Moldova — Cererile nr. 9353/13 și altele — CtEDO</h3>
+            <p class="ds-excerpt">Hotărâre pronunțată de Curtea Europeană a Drepturilor Omului la 18 ianuarie 2024, constatând încălcarea art. 6, 13 din Convenție și a art. 1 din Protocolul nr. 1, în cauza privind neexecutarea hotărârilor judecătorești împotriva debitorilor privați.</p>
+            <span class="ds-cta">Vezi hotărârea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 18 · 20 oct. 2023 · CA Bălți -->
+        <a class="ds-card" href="https://cab.instante.justice.md/ro/pigd_integration/pdf/NjBiZTA3NWQtZWFkMS00MmZiLTk4NjMtNTIzNTlmY2NiMDVh" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea de Apel Bălți</span>
+              <span class="ds-date">20 oct. 2023</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 1a-177/2023 — Curtea de Apel Bălți</h3>
+            <p class="ds-excerpt">Decizia Colegiului Penal al Curții de Apel Bălți din 20 octombrie 2023, în cauza penală cu origine în Judecătoria Edineț (sediul Briceni), cu asigurarea apărării de avocații biroului.</p>
+            <span class="ds-cta">Vezi decizia <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 19 · 10 iul. 2023 · J. Chișinău Centru -->
+        <a class="ds-card" href="https://jc.instante.justice.md/ro/pigd_integration/pdf/YjllYzQ4NTQtYTlhNC00OWY0LTlmMjktYmVjMzNjYTg3Y2Zm" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1423592707957-3b212afa6733?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Judecătoria Chișinău</span>
+              <span class="ds-date">10 iul. 2023</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 2-2450/23 — Judecătoria Chișinău</h3>
+            <p class="ds-excerpt">Hotărâre din 10 iulie 2023, pronunțată de Judecătoria Chișinău (sediul Centru) în cauza civilă, cu reprezentarea asigurată de avocatul Nicolae Ciumac.</p>
+            <span class="ds-cta">Vezi hotărârea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 20 · 5 apr. 2023 · CA Chișinău -->
+        <a class="ds-card" href="https://cac.instante.justice.md/ro/pigd_integration/pdf/NzViOGJjYTUtZWJiZi00ZGU1LWE3YjYtNjI3NDA2NTM0NDk4" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">instante.justice.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea de Apel Chișinău</span>
+              <span class="ds-date">5 apr. 2023</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 3a-1608/22 — Curtea de Apel Chișinău</h3>
+            <p class="ds-excerpt">Decizia Colegiului civil, comercial și de contencios administrativ al Curții de Apel Chișinău din 5 aprilie 2023, în cauza de contencios administrativ.</p>
+            <span class="ds-cta">Vezi decizia <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 21 · 14 feb. 2023 · CtEDO -->
+        <a class="ds-card" href="Dosare1.pdf" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">hudoc.echr.coe.int</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea Europeană a Drepturilor Omului</span>
+              <span class="ds-date">14 feb. 2023</span>
+            </div>
+            <h3 class="ds-cardtitle">Molceanu și alții v. Republica Moldova — Cererile nr. 429/13 și altele — CtEDO</h3>
+            <p class="ds-excerpt">Hotărâre pronunțată de Curtea Europeană a Drepturilor Omului la 14 februarie 2023, constatând încălcarea art. 6, 13 din Convenție și a art. 1 din Protocolul nr. 1, în cauza privind neexecutarea în termen rezonabil a hotărârilor judecătorești interne.</p>
+            <span class="ds-cta">Vezi hotărârea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 22 · 7 dec. 2021 · CtEDO -->
+        <a class="ds-card" href="Dosare6.pdf" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">hudoc.echr.coe.int</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea Europeană a Drepturilor Omului</span>
+              <span class="ds-date">7 dec. 2021</span>
+            </div>
+            <h3 class="ds-cardtitle">Filat v. Republica Moldova — Cererea nr. 11657/16 — CtEDO</h3>
+            <p class="ds-excerpt">Hotărâre pronunțată de Curtea Europeană a Drepturilor Omului la 7 decembrie 2021, în cauza privind imposibilitatea controlului judiciar al detenției provizorii (art. 5 § 4) și prezumția de nevinovăție în cadrul procedurii de ridicare a imunității parlamentare (art. 6 § 2).</p>
+            <span class="ds-cta">Vezi hotărârea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 23 · 4 aug. 2020 · CSJ -->
+        <a class="ds-card" href="https://jurisprudenta.csj.md/search_col_penal.php?id=16529" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1505664194779-8beaceb93744?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">csj.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea Supremă de Justiție</span>
+              <span class="ds-date">4 aug. 2020</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 1ra-1379/2020 — Curtea Supremă de Justiție</h3>
+            <p class="ds-excerpt">Decizia Colegiului Penal lărgit al CSJ din 4 august 2020 asupra recursurilor ordinare, cu reprezentare asigurată de avocații biroului.</p>
+            <span class="ds-cta">Vezi decizia <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 24 · 7 iul. 2020 · CtEDO -->
+        <a class="ds-card" href="Dosare4.pdf" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">hudoc.echr.coe.int</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea Europeană a Drepturilor Omului</span>
+              <span class="ds-date">7 iul. 2020</span>
+            </div>
+            <h3 class="ds-cardtitle">Osadcii și alții v. Republica Moldova — Cererile nr. 51662/12 și altele — CtEDO</h3>
+            <p class="ds-excerpt">Hotărâre pronunțată de Curtea Europeană a Drepturilor Omului la 7 iulie 2020, constatând încălcarea art. 6 § 1 din Convenție și a art. 1 din Protocolul nr. 1, în cauza privind executarea tardivă a hotărârilor judecătorești privind atribuirea locuințelor sociale.</p>
+            <span class="ds-cta">Vezi hotărârea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 25 · 12 dec. 2017 · CtEDO -->
+        <a class="ds-card" href="https://hudoc.echr.coe.int/fre?i=001-179414" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">hudoc.echr.coe.int</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea Europeană a Drepturilor Omului</span>
+              <span class="ds-date">12 dec. 2017</span>
+            </div>
+            <h3 class="ds-cardtitle">Ialamov v. Republica Moldova — Cererea nr. 65324/09 — CtEDO</h3>
+            <p class="ds-excerpt">Hotărâre pronunțată de Curtea Europeană a Drepturilor Omului la 12 decembrie 2017, constatând încălcarea art. 5 din Convenție (dreptul la libertate și siguranță) de către Republica Moldova.</p>
+            <span class="ds-cta">Vezi hotărârea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 26 · 15 feb. 2017 · CSJ -->
+        <a class="ds-card" href="https://jurisprudenta.csj.md/search_col_civil.php?id=34683" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1505664194779-8beaceb93744?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">csj.md</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea Supremă de Justiție</span>
+              <span class="ds-date">15 feb. 2017</span>
+            </div>
+            <h3 class="ds-cardtitle">Dosar nr. 3ra-107/17 — Curtea Supremă de Justiție</h3>
+            <p class="ds-excerpt">Decizia Colegiului civil, comercial și de contencios administrativ lărgit al CSJ din 15 februarie 2017, în cauza privind dreptul de acces la informație, cu reprezentarea asigurată de avocatul Lilian Osoianu.</p>
+            <span class="ds-cta">Vezi decizia <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 27 · 24 feb. 2015 · CtEDO -->
+        <a class="ds-card" href="Dosare2.pdf" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">hudoc.echr.coe.int</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea Europeană a Drepturilor Omului</span>
+              <span class="ds-date">24 feb. 2015</span>
+            </div>
+            <h3 class="ds-cardtitle">Ciobanu v. Republica Moldova — Cererea nr. 62578/09 — CtEDO</h3>
+            <p class="ds-excerpt">Hotărâre pronunțată de Curtea Europeană a Drepturilor Omului la 24 februarie 2015, constatând încălcarea art. 2 din Convenție (dreptul la viață), în cauza privind ancheta ineficientă a autorităților în legătură cu decesul soțului reclamantei.</p>
+            <span class="ds-cta">Vezi hotărârea <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+        <!-- 28 · 10 apr. 2012 · CtEDO -->
+        <a class="ds-card" href="https://hudoc.echr.coe.int/eng?i=001-110766" target="_blank" rel="noopener">
+          <div class="ds-thumb">
+            <div class="ds-thumb-bg" style="background-image:url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=70&fit=crop');"></div>
+            <div class="ds-thumb-overlay"></div>
+            <span class="ds-thumb-src">hudoc.echr.coe.int</span>
+          </div>
+          <div class="ds-body">
+            <div class="ds-meta">
+              <span class="ds-src">Curtea Europeană a Drepturilor Omului</span>
+              <span class="ds-date">10 apr. 2012</span>
+            </div>
+            <h3 class="ds-cardtitle">Furculiță și alții v. Republica Moldova — Cererea nr. 7304/05 și altele — CtEDO</h3>
+            <p class="ds-excerpt">Decizie a Curții Europene a Drepturilor Omului din 10 aprilie 2012 în cauza Furculiță și alții împotriva Republicii Moldova, cereri declarate inadmisibile.</p>
+            <span class="ds-cta">Vezi decizia <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></span>
+          </div>
+        </a>
+
+      
+    </div>
+  </main>
+
+<script src="i18n.js?v=66270367"></script>
+</body>
+</html>

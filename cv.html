@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CV — BuNPartener</title>
+  <meta name="theme-color" content="#0d1b35">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="icon" type="image/png" media="(prefers-color-scheme: dark)" href="favicon-dark.png">
+  <link rel="icon" type="image/png" media="(prefers-color-scheme: light)" href="favicon-light.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600;1,700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+
+  <style>
+    /* Language switcher */
+    .lang-sw { display:flex; flex-direction:column; gap:3px; align-items:center; }
+    .lang-row { display:flex; gap:4px; }
+    .lang-btn { background:none; border:1px solid rgba(255,255,255,.22); border-radius:6px; color:rgba(255,255,255,.5); cursor:pointer; font-family:var(--ff-sans); font-size:11px; font-weight:600; letter-spacing:.06em; padding:5px 9px; transition:border-color .2s,color .2s,background .2s; line-height:1; }
+    .lang-btn:hover { border-color:rgba(255,255,255,.45); color:var(--white); }
+    .lang-btn.active { background:rgba(255,255,255,.1); border-color:rgba(255,255,255,.38); color:var(--white); }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #0d1b35; --navy-2: #142240; --navy-3: #1c3060;
+      --white: #fff; --light: #8a9bbf; --red: #e12d39;
+      --ff-serif: 'Cormorant Garamond', Georgia, serif;
+      --ff-sans: 'DM Sans', system-ui, sans-serif;
+      --max-w: min(1080px, 100% - 48px);
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: var(--ff-sans); color: var(--white); background: var(--navy); line-height: 1.7; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    a { text-decoration: none; color: inherit; }
+    img { max-width: 100%; display: block; }
+    .wrap { width: var(--max-w); margin-inline: auto; }
+
+    /* Top bar */
+    .cv-nav { padding: 26px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+    .cv-nav .wrap { display: flex; align-items: center; justify-content: space-between; }
+    .logo-main { font-family: var(--ff-serif); font-size: 24px; font-weight: 700; color: var(--white); }
+    .logo-n { color: var(--red); font-style: italic; font-weight: 700; font-size: 1.22em; display: inline-block; transform: skewX(-9deg); line-height: 1; }
+    .logo-sub { display: block; font-size: 9px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.4); margin-top: 3px; }
+    .cv-back {
+      display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
+      letter-spacing: .04em; color: rgba(255,255,255,.65); transition: color .2s;
+    }
+    .cv-back:hover { color: var(--white); }
+    .cv-back svg { width: 17px; height: 17px; }
+    .cv-hint {
+      display: none; font-size: 11px; letter-spacing: .05em; color: rgba(255,255,255,.4);
+      text-align: center; padding: 12px 0 2px;
+    }
+    @media (hover: none) and (pointer: coarse) { .cv-hint { display: block; } }
+
+    /* CV body */
+    .cv-main { padding: clamp(48px, 7vw, 92px) 0 100px; }
+    .cv-grid { display: grid; grid-template-columns: 340px 1fr; gap: clamp(36px, 5vw, 72px); align-items: start; }
+
+    .cv-photo {
+      aspect-ratio: 3/4; border-radius: 16px; overflow: hidden; background: var(--navy-2);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    .cv-photo img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+    .cv-avatar {
+      width: 100%; aspect-ratio: 3/4; border-radius: 16px;
+      background: rgba(225,45,57,.08); border: 1px solid rgba(225,45,57,.2);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--ff-serif); font-size: 96px; font-weight: 700; color: rgba(225,45,57,.55);
+    }
+
+    .cv-tag {
+      display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .12em;
+      text-transform: uppercase; color: rgba(255,255,255,.5);
+      border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 7px 16px; margin-bottom: 20px;
+    }
+    .cv-name { font-family: var(--ff-serif); font-size: clamp(36px, 5vw, 54px); font-weight: 600; line-height: 1.08; }
+    .cv-role { font-size: 17px; color: var(--white); margin-top: 14px; font-weight: 500; }
+    .cv-cred { font-size: 14px; color: var(--light); margin-top: 6px; }
+    .cv-rule { height: 1px; background: rgba(255,255,255,.1); margin: 30px 0; }
+    .cv-sec-h {
+      font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+      color: rgba(255,255,255,.45); margin-bottom: 14px;
+    }
+    .cv-bio p { color: rgba(255,255,255,.78); font-size: 16px; margin-bottom: 16px; }
+    .cv-bio p:last-child { margin-bottom: 0; }
+
+    /* CV document button */
+    .cv-doc-btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      margin-top: 28px; padding: 13px 26px; border-radius: 100px;
+      background: var(--red); color: var(--white); font-family: var(--ff-sans);
+      font-size: 14px; font-weight: 600; letter-spacing: .03em;
+      border: none; cursor: pointer; transition: opacity .2s, transform .2s;
+    }
+    .cv-doc-btn:hover { opacity: .88; transform: translateY(-1px); }
+    .cv-doc-btn svg { flex-shrink: 0; }
+
+    /* Modal */
+    .cv-modal-bg {
+      display: none; position: fixed; inset: 0; z-index: 999;
+      background: rgba(8,15,32,.92); backdrop-filter: blur(6px);
+      align-items: center; justify-content: center;
+    }
+    .cv-modal-bg.open { display: flex; }
+    .cv-modal {
+      position: relative; width: min(920px, 96vw); height: min(88vh, 860px);
+      background: var(--navy-2); border: 1px solid rgba(255,255,255,.1);
+      border-radius: 16px; overflow: hidden; display: flex; flex-direction: column;
+    }
+    .cv-modal-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,.08); flex-shrink: 0;
+    }
+    .cv-modal-title { font-size: 13px; font-weight: 600; color: rgba(255,255,255,.65); letter-spacing: .04em; }
+    .cv-modal-close {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px; border-radius: 50%; border: none;
+      background: rgba(255,255,255,.08); color: var(--white); cursor: pointer;
+      transition: background .2s;
+    }
+    .cv-modal-close:hover { background: rgba(255,255,255,.16); }
+    .cv-modal iframe { flex: 1; width: 100%; border: 0; }
+
+    @media (max-width: 720px) {
+      .cv-grid { grid-template-columns: 1fr; gap: 32px; }
+      .cv-photo, .cv-avatar { max-width: 300px; }
+      .cv-avatar { font-size: 76px; }
+    }
+    /* ── Accessibility ───────────────────────────────── */
+    .skip-link{position:fixed;left:12px;top:-64px;z-index:3000;background:#fff;color:#0d1b35;padding:10px 18px;border-radius:8px;font-family:'DM Sans',system-ui,sans-serif;font-size:14px;font-weight:600;text-decoration:none;box-shadow:0 6px 20px rgba(0,0,0,.25);transition:top .18s ease;}
+    .skip-link:focus{top:12px;}
+    :focus-visible{outline:2px solid #3b6ef6;outline-offset:2px;}
+  </style>
+  <!-- i18n-seo:start -->
+  <link rel="alternate" hreflang="ro" href="https://bunpartener.md/cv.html">
+  <link rel="alternate" hreflang="en" href="https://bunpartener.md/en/cv.html">
+  <link rel="alternate" hreflang="ru" href="https://bunpartener.md/ru/cv.html">
+  <link rel="alternate" hreflang="it" href="https://bunpartener.md/it/cv.html">
+  <link rel="alternate" hreflang="fr" href="https://bunpartener.md/fr/cv.html">
+  <link rel="alternate" hreflang="x-default" href="https://bunpartener.md/cv.html">
+  <!-- i18n-seo:end -->
+</head>
+<body>
+<a class="skip-link" href="#main-content" data-i18n="nav.skip">Sari la conținut</a>
+
+  <nav class="cv-nav">
+    <div class="wrap">
+      <a href="index.html#team" aria-label="BuNPartener" style="display:flex;align-items:center">
+        <img src="logoonly_transparent.png" alt="BuNPartener" style="height:42px;width:auto;display:block">
+      </a>
+      <div class="lang-sw" role="group" aria-label="Limbă / Language" style="margin-right:12px">
+        <div class="lang-row">
+          <button class="lang-btn" data-lang="ro">RO</button>
+          <button class="lang-btn" data-lang="en">EN</button>
+          <button class="lang-btn" data-lang="ru">RU</button>
+        </div>
+        <div class="lang-row">
+          <button class="lang-btn" data-lang="it">IT</button>
+          <button class="lang-btn" data-lang="fr">FR</button>
+        </div>
+      </div>
+      <a class="cv-back" href="index.html#team">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        <span data-i18n="cv.back">Înapoi la echipă</span>
+      </a>
+    </div>
+  </nav>
+
+  <main id="main-content" tabindex="-1" class="cv-main">
+    <div class="wrap">
+      <div class="cv-hint" data-i18n="cv.hint">Glisați spre dreapta pentru a reveni</div>
+      <div class="cv-grid">
+        <div id="cv-media"><!-- photo or avatar injected --></div>
+        <div>
+          <span class="cv-tag" id="cv-tag">Membru al echipei</span>
+          <h1 class="cv-name" id="cv-name">—</h1>
+          <p class="cv-role" id="cv-role"></p>
+          <p class="cv-cred" id="cv-cred"></p>
+          <div class="cv-rule"></div>
+          <div class="cv-sec-h" data-i18n="cv.section.bio">Prezentare</div>
+          <div class="cv-bio" id="cv-bio"></div>
+          <div id="cv-doc-wrap"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- CV document modal -->
+  <div class="cv-modal-bg" id="cv-modal-bg" role="dialog" aria-modal="true" aria-label="CV document">
+    <div class="cv-modal">
+      <div class="cv-modal-bar">
+        <span class="cv-modal-title" id="cv-modal-title">Curriculum Vitae</span>
+        <button class="cv-modal-close" id="cv-modal-close" aria-label="Închide">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <iframe id="cv-modal-frame" title="Curriculum Vitae" allowfullscreen></iframe>
+    </div>
+  </div>
+
+  <script>
+    /* ── Team data — keyed by slug. Bio text is placeholder until real CVs are added. ── */
+    const TEAM = {
+      "viorel-berliba":   { name: "Viorel V. BERLIBA", type: "asociat", role: "avocat-coordonator", cred: "conferențiar universitar · doctor habilitat în drept", img: "Viorel Berliba.jpg", cvFile: "CVViorel.pdf",
+        bio: [
+          "Ceea ce m-a atras în profesia de avocat este posibilitatea de a schimba mentalități și a distruge stereotipuri prin activități legale și rezultate necesare. Folosesc în activitatea zilnică mai multe instrumente juridice, prin care încerc să fiu alături de Omul aflat în dificultate, care are o anumită problemă juridică și de a-i oferi nu doar apărare, ci și o anumită certitudine. Mă implic în general în cauzele penale, dar acord sprijin colegilor mei în toate cauzele gestionate de echipa Bu<span style=\"color:#e12d39;font-style:italic;font-weight:700;font-size:1.15em\">N</span>Partener. Dreptul penal nu este pentru mine o simplă tehnică juridică, ci menține un angajament stabil față de echitate și față de demnitatea Omului pe care îl reprezint. Activitatea didactică și științifică, pe de o parte, dar și cea practico-aplicativă, pe de altă parte, se completează reciproc: cercetarea îmi propulsează gândirea critică, iar în sala de judecată îmi testez zilnic cunoștințele teoretice.",
+          "La Bu<span style=\"color:#e12d39;font-style:italic;font-weight:700;font-size:1.15em\">N</span>Partener contribui cu o experiență de peste 28 ani în domeniul didactico-științific (fiind axat exclusiv pe domeniul dreptului penal), dar și cu o implicare activă de peste 10 ani în domeniul avocaturii, participând la gestionarea multiplelor cauze penale în Republica Moldova, dar și în alte state ale lumii (în echipe de avocați multinaționale). În calitatea mea de cadru didactic și cercetător științific, dar și în rolul de avocat-coordonator încerc în permanență să contribui și să consolidez echipa Bu<span style=\"color:#e12d39;font-style:italic;font-weight:700;font-size:1.15em\">N</span>Partener spre asigurarea unui standard înalt de calitate în fiecare dosar pe care îl preluăm și îl gestionăm."
+        ]
+      },
+      "ala-berliba":      { name: "Alla BERLIBA", type: "asociat", role: "avocat-asociat", img: "Ala.jpg" },
+      "rostislav-sobietki":{ name: "Rostislav SOBIEȚKI", type: "asociat", role: "avocat-asociat", cred: "doctor în drept", img: "Rostislav.jpg" },
+      "vasile-contescu":  { name: "Vasile CONȚESCU", type: "asociat", role: "avocat-stagiar asociat", img: "Contescu.jpg" },
+      "ana-felicia-talmaci":{ name: "Ana-Felicia TALMACI", type: "asociat", role: "avocat-stagiar asociat", img: "Ana Felicia2.jpg" },
+      "tudor-osoianu":    { name: "Tudor OSOIANU", type: "colaborare", role: "avocat prin colaborare · CA „Tudor OSOIANU”", cred: "profesor universitar · doctor în drept", img: "Tudor.jpg" },
+      "lilian-osoian":    { name: "Lilian OSOIAN", type: "colaborare", role: "avocat prin colaborare · CA „Lilian OSOIAN”", img: "Lilian2.jpg" },
+      "elena-buguta":     { name: "Elena BUGUȚA", type: "colaborare", role: "avocat prin colaborare · CA „Elena BUGUȚA”", cred: "conferențiar universitar · doctor în drept", img: "Elena.jpg" },
+      "nicolae-ciumac":   { name: "Nicolae CIUMAC", type: "colaborare", role: "avocat prin colaborare · CA „Nicolae CIUMAC”", img: "Ciumac.jpg" },
+      "vasile-pruneanu":  { name: "Vasile PRUNEANU", type: "colaborare", role: "avocat prin colaborare · CA „Vasile PRUNEANU”", img: "Pruneanu.jpg" },
+      "angela-munteanu":  { name: "Angela MUNTEANU", type: "colaborare", role: "avocat prin colaborare · CA „Angela MUNTEANU”", img: "Munteanu.jpg" },
+      "serghei-gavajuc":  { name: "Serghei GAVAJUC", type: "colaborare", role: "avocat prin colaborare · CA „Serghei GAVAJUC”", cred: "doctor în drept", img: "Gavajuc2.jpg" },
+      "ina-donica":       { name: "Ina DONICA", type: "colaborare", role: "avocat prin colaborare · CA „Ina DONICA”", img: "Ina.jpg" },
+      "francisco-talmaci":{ name: "Francisco TALMACI", type: "colaborare", role: "avocat prin colaborare · CA „Francisco TALMACI”", cred: "doctor în drept", img: "Talmaci.jpg" },
+      "ana-maria-soitu":  { name: "Ana-Maria ȘOITU", type: "colaborare", role: "avocat-stagiar prin colaborare · CA „Elena BUGUȚA”", img: "Soitu.jpg" },
+      "alexandru-ciobanas":{ name: "Alexandru CIOBANAȘ", type: "colaborare", role: "avocat prin colaborare · CA „Alexandru CIOBANAȘ”", img: "Ciobanas.jpg" }
+    };
+
+    const PLACEHOLDER_BIO = [
+      "Text de probă — conținutul real al CV-ului va fi adăugat în curând. Această secțiune va prezenta experiența profesională, domeniile de specializare și parcursul academic al avocatului.",
+      "Cu o practică juridică solidă, contribuie la activitatea biroului prin abordarea riguroasă a fiecărui dosar și prin atenția acordată intereselor clienților.",
+      "Detaliile complete — studii, publicații, cauze reprezentative și recunoașteri profesionale — vor fi disponibile aici după actualizarea paginii."
+    ];
+
+    function initialsOf(name) {
+      return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+    }
+
+    /* ── Static setup (runs once — name, photo, bio don't change with language) ── */
+    var _cvPerson = TEAM[new URLSearchParams(location.search).get("id")];
+
+    (function () {
+      var p = _cvPerson;
+      var media = document.getElementById("cv-media");
+
+      if (!p) {
+        media.innerHTML = '<div class="cv-avatar">?</div>';
+        return;
+      }
+
+      document.title = p.name + " — BuNPartener";
+      document.getElementById("cv-name").textContent = p.name;
+
+      if (p.img) {
+        var im = document.createElement("img");
+        im.src = p.img; im.alt = p.name;
+        var box = document.createElement("div");
+        box.className = "cv-photo"; box.appendChild(im);
+        media.appendChild(box);
+      } else {
+        media.innerHTML = '<div class="cv-avatar">' + initialsOf(p.name) + '</div>';
+      }
+
+      var bioLines = p.bio || PLACEHOLDER_BIO;
+      document.getElementById("cv-bio").innerHTML =
+        bioLines.map(function (line) { return "<p>" + line + "</p>"; }).join("");
+
+      if (p.cvFile) {
+        var wrap = document.getElementById("cv-doc-wrap");
+        var btn = document.createElement("button");
+        btn.className = "cv-doc-btn";
+        btn.innerHTML =
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' +
+          '<span id="cv-doc-lbl">Deschide CV-ul</span>';
+        btn.addEventListener("click", function () {
+          document.getElementById("cv-modal-frame").src = p.cvFile;
+          document.getElementById("cv-modal-title").textContent = "Curriculum Vitae — " + p.name;
+          document.getElementById("cv-modal-bg").classList.add("open");
+        });
+        wrap.appendChild(btn);
+      }
+    })();
+
+    /* ── Translatable parts — called by i18n.js on every language switch ── */
+    window._cvUpdate = function (t) {
+      var p = _cvPerson;
+      var roleMap = t['role_map'] || {};
+
+      if (!p) {
+        var nameEl = document.getElementById("cv-name");
+        var roleEl = document.getElementById("cv-role");
+        if (nameEl) nameEl.textContent = t['cv.unavail'] || 'Membru indisponibil';
+        if (roleEl) roleEl.textContent = t['cv.select'] || 'Selectați un membru din pagina echipei.';
+        return;
+      }
+
+      /* tag */
+      var tagEl = document.getElementById("cv-tag");
+      if (tagEl) {
+        tagEl.textContent = p.type === 'asociat'
+          ? (t['cv.tag.asociat'] || 'Membru asociat al biroului')
+          : p.type === 'colaborare'
+            ? (t['cv.tag.colaborare'] || 'Membru prin colaborare')
+            : (t['cv.tag.other'] || 'Membru al echipei');
+      }
+
+      /* role — translate prefix, preserve " · CA „…"" suffix if present */
+      var roleEl = document.getElementById("cv-role");
+      if (roleEl && p.role) {
+        var caIdx = p.role.indexOf(' · CA ');
+        if (caIdx > -1) {
+          var base = p.role.substring(0, caIdx);
+          roleEl.textContent = (roleMap[base] || base) + p.role.substring(caIdx);
+        } else {
+          roleEl.textContent = roleMap[p.role] || p.role;
+        }
+      }
+
+      /* cred */
+      var credEl = document.getElementById("cv-cred");
+      if (credEl) credEl.textContent = p.cred ? (roleMap[p.cred] || p.cred) : '';
+
+      /* open-cv button label */
+      var lblEl = document.getElementById("cv-doc-lbl");
+      if (lblEl) lblEl.textContent = t['cv.open'] || 'Deschide CV-ul';
+    };
+
+    /* ── Modal close ── */
+    (function () {
+      const bg = document.getElementById("cv-modal-bg");
+      const closeBtn = document.getElementById("cv-modal-close");
+      function closeModal() {
+        bg.classList.remove("open");
+        document.getElementById("cv-modal-frame").src = "";
+      }
+      closeBtn.addEventListener("click", closeModal);
+      bg.addEventListener("click", function (e) { if (e.target === bg) closeModal(); });
+      document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeModal(); });
+    })();
+
+    /* ── Easy "back": Escape on desktop, swipe-right or swipe-down-from-top on touch ── */
+    (function () {
+      const backLink = document.querySelector(".cv-back");
+      const goBack = () => { window.location.href = backLink.getAttribute("href"); };
+
+      /* Show the swipe hint only on touch-capable devices */
+      const isTouch = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+      if (isTouch) document.querySelector(".cv-hint").style.display = "block";
+
+      /* Touch: swipe right (anywhere) to go back */
+      let sx = 0, sy = 0, tracking = false;
+      window.addEventListener("touchstart", e => {
+        if (e.touches.length !== 1) { tracking = false; return; }
+        tracking = true;
+        sx = e.touches[0].clientX;
+        sy = e.touches[0].clientY;
+      }, { passive: true });
+
+      window.addEventListener("touchend", e => {
+        if (!tracking) return;
+        tracking = false;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - sx;
+        const dy = t.clientY - sy;
+        const swipeRight = dx > 75 && Math.abs(dx) > Math.abs(dy) * 1.4;
+        if (swipeRight) goBack();
+      }, { passive: true });
+    })();
+  </script>
+
+<script src="i18n.js?v=66270367"></script>
+</body>
+</html>
