@@ -2358,6 +2358,17 @@
           font-family:'Montserrat',sans-serif; font-size:clamp(.58rem,1.3vw,.72rem);
           font-weight:400; color:rgba(255,255,255,.4); letter-spacing:.18em; text-transform:uppercase;
         }
+        .bday-timer-wrap { margin-top:28px; }
+        .bday-timer-label {
+          font-family:'Montserrat',sans-serif; font-size:.58rem; font-weight:300;
+          color:rgba(255,255,255,.3); letter-spacing:.16em; text-transform:uppercase; margin-bottom:8px;
+        }
+        #bday-timer {
+          font-family:'Montserrat',sans-serif; font-size:clamp(1.6rem,5vw,2.4rem);
+          font-weight:300; color:#f5d76e; letter-spacing:.12em;
+          font-variant-numeric:tabular-nums;
+          animation:bdayGlow 2.2s ease-in-out infinite;
+        }
         #bday-close {
           position:fixed; top:24px; right:28px; z-index:99001;
           width:40px; height:40px; border-radius:50%;
@@ -2408,6 +2419,10 @@
           <div class="bday-modal-div"></div>
           <p class="bday-modal-msg">Dragă Tudor, în această zi specială, întreaga echipă a Biroului asociat de avocați «Berliba și Partenerii» îți transmite cele mai sincere și călduroase urări. Fie ca acest an să îți aducă sănătate deplină, bucurii nesfârșite și noi împliniri atât în cariera ta juridică, cât și în viața personală. Dedicarea, profesionalismul și spiritul tău colegial sunt o inspirație zilnică pentru fiecare dintre noi. Mulți ani înainte, cu succes în tot ceea ce îți propui!</p>
           <div class="bday-modal-sig">— Berliba și Partenerii · BuNPartener</div>
+          <div class="bday-timer-wrap">
+            <div class="bday-timer-label">ziua ta a început de</div>
+            <div id="bday-timer">00:00:00</div>
+          </div>
         </div>
       </div>
       <button id="bday-close" aria-label="Închide">&#x2715;</button>
@@ -2497,6 +2512,21 @@
             modal.appendChild(c);
           }
         }
+        // Timer — counts up from midnight June 19 Moldova time (EEST = UTC+3)
+        var bdayStart = new Date('2026-06-18T21:00:00Z').getTime();
+        var bdayEnd   = bdayStart + 24*3600000;
+        function pad2(n){ return n<10?'0'+n:''+n; }
+        function updateTimer(){
+          var el=document.getElementById('bday-timer'); if(!el) return;
+          var elapsed=Date.now()-bdayStart;
+          if(elapsed<0) elapsed=0;
+          if(elapsed>24*3600000) elapsed=24*3600000;
+          var h=~~(elapsed/3600000), m=~~((elapsed%3600000)/60000), s=~~((elapsed%60000)/1000);
+          el.textContent=pad2(h)+':'+pad2(m)+':'+pad2(s);
+        }
+        updateTimer();
+        setInterval(updateTimer,1000);
+
         function spawnBalloons(){
           [['8%','#e74c3c',3.8],['20%','#f5d76e',4.4],['78%','#3498db',4.1],['90%','#2ecc71',3.6]].forEach(function(b,i){
             var el=document.createElement('div'); el.className='bday-balloon';
