@@ -231,8 +231,14 @@ OVERLAY_TEXT = {
         ('aria-label="Închide"',               'aria-label="Закрыть"'),
         ('<span>Berliba și Partenerii</span>',  '<span>Берлиба и Партнеры</span>'),
         ('<span>Birou asociat de avocați</span>','<span>Адвокатское бюро</span>'),
+        # pre ends without "Bu" so the whole brand name is in one nowrap span
         ("'Un mesaj, pentru siguranța ta juridică, din partea Bu'",
-         "'Послание для вашей правовой защиты от Bu'"),
+         "'Послание для вашей правовой защиты от '"),
+        # wrap Bu+N+Partener in nowrap so the brand never line-breaks
+        ("'<em style=\"color:#c0392b;font-style:italic;font-size:1.2em;font-weight:400\">N</em>'",
+         "'<span style=\"white-space:nowrap\">Bu<em style=\"color:#c0392b;font-style:italic;font-size:1.2em;font-weight:400\">N</em>'"),
+        ("var post = 'Partener';",
+         "var post = 'Partener</span>';"),
     ],
     "it": [
         ('id="vf-tooltip">Mesaj<',             'id="vf-tooltip">Messaggio<'),
