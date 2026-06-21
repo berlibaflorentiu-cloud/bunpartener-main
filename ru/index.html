@@ -3371,7 +3371,7 @@
       <div id="vfo-div"></div>
       <div>
         <div id="vfo-name">Bu<em style="color:#c0392b;font-style:italic;">N</em>Partener</div>
-        <div id="vfo-sub"><span>Берлиба и Партнеры</span><span>Адвокатское бюро</span></div>
+        <div id="vfo-sub"><span></span><span></span></div>
       </div>
     </div>
   </div>
@@ -3421,6 +3421,20 @@
     arr.push(stN);
     for(var i=0;i<post.length;i++) arr.push(post[i]);
     return arr;
+  })();
+
+  var SUB_MAP = {
+    ro: ['Berliba și Partenerii',   'Birou asociat de avocați'],
+    en: ['Berliba and Partners',    'Associated law firm'],
+    ru: ['Берлиба и Партнёры',      'Ассоциированная адвокатская контора'],
+    it: ['Berliba e Soci',          'Studio associato di avvocati'],
+    fr: ['Berliba et Associés',     'Cabinet d\'avocats associés']
+  };
+  (function(){
+    var sub = document.getElementById('vfo-sub');
+    var labels = SUB_MAP[window._lang] || SUB_MAP.ro;
+    sub.children[0].textContent = labels[0];
+    sub.children[1].textContent = labels[1];
   })();
 
   var textStarted = false;
