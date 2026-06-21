@@ -775,27 +775,35 @@ async function logout() {
 // LOAD DATA & SHOW APP
 // ═══════════════════════════════════════
 
+function dbTimeout(promise, ms = 12000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+  ]);
+}
+
 async function loadAll() {
   try {
-    const { data: { user } } = await db.auth.getUser();
+    const { data: { user } } = await dbTimeout(db.auth.getUser());
     if (!user) { showLoginScreen(); return; }
 
-    const { data: profile, error: pe } = await db.from('profiles').select('*').eq('id', user.id).single();
+    const { data: profile, error: pe } = await dbTimeout(
+      db.from('profiles').select('*').eq('id', user.id).single()
+    );
     if (!profile || pe) { db.auth.signOut(); showLoginScreen(); return; }
     currentUser = profile;
+
+    const [usersRes, entriesRes] = await dbTimeout(Promise.all([
+      db.from('profiles').select('*').order('name'),
+      db.from('entries').select('*').order('date', { ascending: false })
+    ]));
+    allUsers   = usersRes.data  || [];
+    allEntries = entriesRes.data || [];
+
+    showApp();
   } catch (e) {
     showLoginScreen();
-    return;
   }
-
-  const [usersRes, entriesRes] = await Promise.all([
-    db.from('profiles').select('*').order('name'),
-    db.from('entries').select('*').order('date', { ascending: false })
-  ]);
-  allUsers   = usersRes.data  || [];
-  allEntries = entriesRes.data || [];
-
-  showApp();
 }
 
 function showLoginScreen() {
