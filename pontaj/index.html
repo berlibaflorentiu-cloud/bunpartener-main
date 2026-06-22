@@ -1254,7 +1254,7 @@ function renderAvocat(user) {
         </div>
         <div class="field">
           <label>Client / Dosar</label>
-          <input type="text" id="f-client" placeholder="ex. SC Alpha SRL — dosar 142/2024">
+          <input type="text" id="f-client" name="client-no-autofill" placeholder="ex. SC Alpha SRL — dosar 142/2024" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         </div>
         <div class="field" style="grid-column:1/-1">
           <label>Activitate predefinită</label>
@@ -1265,7 +1265,7 @@ function renderAvocat(user) {
         </div>
         <div class="field" style="grid-column:1/-1">
           <label>Descriere activitate</label>
-          <input type="text" id="f-desc" placeholder="ex. Redactare contract, consultație, reprezentare..." oninput="descInput()" onkeydown="descKeydown(event)" onblur="setTimeout(closeAc,200)">
+          <input type="text" id="f-desc" name="desc-no-autofill" placeholder="ex. Redactare contract, consultație, reprezentare..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" oninput="descInput()" onkeydown="descKeydown(event)" onblur="setTimeout(closeAc,200)">
           <input type="hidden" id="f-fixed-price" value="">
           <input type="hidden" id="f-fixed-type" value="">
         </div>
