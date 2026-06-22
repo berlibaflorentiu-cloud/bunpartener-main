@@ -2056,7 +2056,16 @@ async function generateAct() {
   const totalOnorariu   = entries.reduce((s, e) => s + entryOnorariu(e), 0);
   const totalCheltuieli = entries.reduce((s, e) => s + entryCheltuiala(e), 0);
   const grandTotal      = totalOnorariu + totalCheltuieli;
-  const birouExtra      = Math.floor(grandTotal / 4000) * 100;
+
+  // birouExtra is charged per client: 100 MDL for every 4000 MDL spent by that client.
+  // Group entries by client, compute the extra for each group, then sum.
+  const _clientTotals = {};
+  entries.forEach(e => {
+    const key = (e.client || '').trim() || '__none__';
+    _clientTotals[key] = (_clientTotals[key] || 0) + entryOnorariu(e) + entryCheltuiala(e);
+  });
+  const birouExtra = Object.values(_clientTotals)
+    .reduce((s, t) => s + Math.floor(t / 4000) * 100, 0);
 
   const contractDateFmt = contractDate ? fmtDate(contractDate) : '___________';
   const dayNow    = String(now.getDate()).padStart(2,'0');
