@@ -630,10 +630,6 @@
         <label class="auth-label">Parolă (min. 6 caractere)</label>
         <input type="password" id="r-password" class="auth-input" placeholder="••••••••">
       </div>
-      <div>
-        <label class="auth-label">Tarif orar (EUR/h)</label>
-        <input type="number" id="r-rate" class="auth-input" value="150" min="0" step="50">
-      </div>
       <button class="auth-submit" id="btn-register" onclick="register()">Creare cont</button>
       <div class="auth-msg" id="register-msg"></div>
     </div>
@@ -778,14 +774,13 @@ async function register() {
   const name     = document.getElementById('r-name').value.trim();
   const email    = document.getElementById('r-email').value.trim();
   const password = document.getElementById('r-password').value;
-  const rate     = parseFloat(document.getElementById('r-rate').value) || 150;
   if (!name)              { showAuthMsg('register', 'Introduceți numele complet.'); return; }
   if (!email)             { showAuthMsg('register', 'Introduceți emailul.'); return; }
   if (password.length < 6){ showAuthMsg('register', 'Parola trebuie să aibă minim 6 caractere.'); return; }
   setAuthLoading('register', true);
   const { error } = await db.auth.signUp({
     email, password,
-    options: { data: { name, rate: rate.toString() } }
+    options: { data: { name } }
   });
   setAuthLoading('register', false);
   if (error) { showAuthMsg('register', error.message); return; }
@@ -1173,7 +1168,7 @@ function renderAvocat(user) {
       <div class="stat-card">
         <div class="stat-label">Total de plată</div>
         <div class="stat-value" style="font-size:28px">${fmtMoney(money)}</div>
-        <div class="stat-sub">${user.rate} EUR / oră</div>
+        <div class="stat-sub">în perioada selectată</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Înregistrări</div>
