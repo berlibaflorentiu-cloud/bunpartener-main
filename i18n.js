@@ -245,6 +245,10 @@
       'ft.contact':  'Contact',
       'ft.rights':   '© 2017–2026 Bu<span class="logo-n">N</span>Partener. Toate drepturile rezervate.',
       'ft.name':     'Biroul asociat de avocați "Berliba și Partenerii" (Bu<span class="logo-n">N</span>Partener)',
+      'ft.privacy':  'Politica de confidențialitate',
+      'ft.terms':    'Termeni de utilizare',
+      'cookie.msg':  'Acest site folosește exclusiv cookie-uri esențiale pentru funcționare. <a href="/privacy.html">Politica de confidențialitate</a>',
+      'cookie.ok':   'Am înțeles',
 
       /* dosare page */
       'ds.tag':      'Registru de dosare',
@@ -480,6 +484,10 @@
       'ft.contact':  'Контакт',
       'ft.rights':   '© 2017–2026 Bu<span class="logo-n">N</span>Partener. Все права защищены.',
       'ft.name':     'Адвокатское бюро "Berliba și Partenerii" (Bu<span class="logo-n">N</span>Partener)',
+      'ft.privacy':  'Политика конфиденциальности',
+      'ft.terms':    'Условия использования',
+      'cookie.msg':  'Этот сайт использует только основные файлы cookie. <a href="/privacy.html">Политика конфиденциальности</a>',
+      'cookie.ok':   'Понятно',
 
       'ds.tag':      'Дела адвокатского бюро',
       'ds.title':    'Дела из практики <em>адвокатского бюро</em>',
@@ -711,6 +719,10 @@
       'ft.contact':  'Contatti',
       'ft.rights':   '© 2017–2026 Bu<span class="logo-n">N</span>Partener. Tutti i diritti riservati.',
       'ft.name':     'Studio Legale "Berliba și Partenerii" (Bu<span class="logo-n">N</span>Partener)',
+      'ft.privacy':  'Informativa sulla privacy',
+      'ft.terms':    'Termini di utilizzo',
+      'cookie.msg':  'Questo sito utilizza solo cookie tecnici essenziali. <a href="/privacy.html">Informativa sulla privacy</a>',
+      'cookie.ok':   'Ho capito',
 
       'ds.tag':      'Registro fascicoli',
       'ds.title':    'Fascicoli <em>rappresentati</em>',
@@ -942,6 +954,10 @@
       'ft.contact':  'Contact',
       'ft.rights':   '© 2017–2026 Bu<span class="logo-n">N</span>Partener. Tous droits réservés.',
       'ft.name':     'Cabinet d\'avocats «Berliba și Partenerii» (Bu<span class="logo-n">N</span>Partener)',
+      'ft.privacy':  'Politique de confidentialité',
+      'ft.terms':    'Conditions d\'utilisation',
+      'cookie.msg':  'Ce site utilise uniquement des cookies essentiels. <a href="/privacy.html">Politique de confidentialité</a>',
+      'cookie.ok':   'J\'ai compris',
 
       'ds.tag':      'Registre des dossiers',
       'ds.title':    'Dossiers <em>représentés</em>',
@@ -1175,6 +1191,10 @@
       'ft.contact':  'Contact',
       'ft.rights':   '© 2017–2026 Bu<span class="logo-n">N</span>Partener. All rights reserved.',
       'ft.name':     'Law Firm "Berliba și Partenerii" (Bu<span class="logo-n">N</span>Partener)',
+      'ft.privacy':  'Privacy Policy',
+      'ft.terms':    'Terms of Use',
+      'cookie.msg':  'This site uses only essential cookies. <a href="/privacy.html">Privacy Policy</a>',
+      'cookie.ok':   'Got it',
 
       'ds.tag':      'Firm cases',
       'ds.title':    'Cases from the firm\'s <em>practice</em>',
