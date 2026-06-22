@@ -1135,6 +1135,10 @@ function updateClientMatchHint() {
 
 function sumH(arr) { return arr.reduce((s, e) => s + Number(e.hours), 0); }
 
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 // ═══════════════════════════════════════
 // DATE / FORMAT HELPERS
 // ═══════════════════════════════════════
@@ -1239,7 +1243,7 @@ async function showRequests() {
         ${list.map(u => `
           <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;gap:16px;flex-wrap:wrap">
             <div>
-              <div style="font-weight:600;font-size:15px">${u.name}</div>
+              <div style="font-weight:600;font-size:15px">${esc(u.name)}</div>
               <div style="font-size:12px;color:var(--muted);margin-top:3px">${u.created_at ? new Date(u.created_at).toLocaleDateString('ro-MD') : ''}</div>
             </div>
             <div style="display:flex;gap:8px">
@@ -1502,8 +1506,8 @@ function renderAvocat(user) {
               ${entries.map(e => `
                 <tr data-entry-id="${e.id}">
                   <td class="td-date" data-label="Data">${fmtDate(e.date)}</td>
-                  <td class="td-client" data-label="Client / Dosar" style="color:var(--muted);font-size:13px">${e.client || '—'}</td>
-                  <td class="td-desc" data-label="Descriere">${e.description}</td>
+                  <td class="td-client" data-label="Client / Dosar" style="color:var(--muted);font-size:13px">${esc(e.client) || '—'}</td>
+                  <td class="td-desc" data-label="Descriere">${esc(e.description)}</td>
                   <td class="td-hours" data-label="Ore / Valoare">${e.fixed_price != null ? fmtMoney(e.fixed_price) : Number(e.hours).toFixed(1) + 'h'}</td>
                   <td class="td-del">
                     <button class="btn-edit" onclick="editEntry('${e.id}')" aria-label="Editează" title="Editează"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
@@ -1746,8 +1750,8 @@ function _restoreEntryRow(row, e) {
   const isFixed = e.fixed_price != null;
   const val     = isFixed ? fmtMoney(e.fixed_price) : Number(e.hours).toFixed(1) + 'h';
   row.querySelector('.td-date').innerHTML   = fmtDate(e.date);
-  row.querySelector('.td-client').innerHTML = e.client || '—';
-  row.querySelector('.td-desc').innerHTML   = e.description;
+  row.querySelector('.td-client').innerHTML = esc(e.client) || '—';
+  row.querySelector('.td-desc').innerHTML   = esc(e.description);
   row.querySelector('.td-hours').innerHTML  = val;
   row.querySelector('.td-del').innerHTML    = `
     <button class="btn-edit" onclick="editEntry('${e.id}')" aria-label="Editează" title="Editează"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
@@ -1796,7 +1800,7 @@ function renderAdmin() {
               style="position:absolute;top:7px;right:8px;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;line-height:1;padding:2px 5px;border-radius:4px;transition:color 0.15s,background 0.15s"
               onmouseover="this.style.color='#e05c5c';this.style.background='rgba(224,92,92,0.12)'"
               onmouseout="this.style.color='var(--muted)';this.style.background='none'">✕</button>
-            <div class="lsc-name" style="padding-right:20px">${u.name}</div>
+            <div class="lsc-name" style="padding-right:20px">${esc(u.name)}</div>
             <div class="lsc-row"><span>Ore</span><span>${uH.toFixed(1)} h</span></div>
             <div class="lsc-row"><span>Total</span><span>${fmtEarnings(uM)}</span></div>
             <div class="lsc-row">
@@ -1860,8 +1864,8 @@ function renderAdmin() {
                   <tr data-entry-id="${e.id}">
                     <td class="td-date" data-label="Data">${fmtDate(e.date)}</td>
                     <td class="td-avocat" data-label="Avocat" style="font-weight:500;font-size:13px">${u?.name || '—'}</td>
-                    <td class="td-client" data-label="Client / Dosar" style="color:var(--muted);font-size:13px">${e.client || '—'}</td>
-                    <td class="td-desc" data-label="Descriere" style="font-size:14px">${e.description}</td>
+                    <td class="td-client" data-label="Client / Dosar" style="color:var(--muted);font-size:13px">${esc(e.client) || '—'}</td>
+                    <td class="td-desc" data-label="Descriere" style="font-size:14px">${esc(e.description)}</td>
                     <td class="td-hours" data-label="Ore / Valoare">${val}</td>
                     <td class="td-del">
                       <button class="btn-edit" onclick="editEntry('${e.id}')" aria-label="Editează" title="Editează"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
@@ -2156,7 +2160,7 @@ async function generateAct() {
             return `
               <tr>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${i + 1}.</td>
-                <td style="border:1px solid #000;padding:5px 6px;">${e.description}${e.client ? ' <em>(' + e.client + ')</em>' : ''}</td>
+                <td style="border:1px solid #000;padding:5px 6px;">${esc(e.description)}${e.client ? ' <em>(' + esc(e.client) + ')</em>' : ''}</td>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${u?.name || '—'}</td>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${hoursDisplay}</td>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${rateDisplay}</td>
