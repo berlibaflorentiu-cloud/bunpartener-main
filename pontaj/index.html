@@ -2124,6 +2124,7 @@ async function generateAct() {
             <th style="border:1px solid #000;padding:5px 6px;text-align:left;">Activitatea realizată</th>
             <th style="border:1px solid #000;padding:5px 6px;text-align:center;width:110px;">Avocatul</th>
             <th style="border:1px solid #000;padding:5px 6px;text-align:center;width:70px;">Nr. ore</th>
+            <th style="border:1px solid #000;padding:5px 6px;text-align:center;width:70px;">Tarif EUR/h</th>
             <th style="border:1px solid #000;padding:5px 6px;text-align:center;width:90px;">Suma onorariului – MDL</th>
             <th style="border:1px solid #000;padding:5px 6px;text-align:center;width:80px;">Cheltuieli</th>
           </tr>
@@ -2134,12 +2135,14 @@ async function generateAct() {
             const hon  = entryOnorariu(e);
             const chel = entryCheltuiala(e);
             const hoursDisplay = e.fixed_price != null ? '—' : `${Number(e.hours).toFixed(1)} ore`;
+            const rateDisplay  = e.fixed_price != null ? '—' : `${u?.rate ?? '—'} EUR`;
             return `
               <tr>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${i + 1}.</td>
                 <td style="border:1px solid #000;padding:5px 6px;">${e.description}${e.client ? ' <em>(' + e.client + ')</em>' : ''}</td>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${u?.name || '—'}</td>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${hoursDisplay}</td>
+                <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${rateDisplay}</td>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${hon > 0 ? fmtMoney(hon) : '—'}</td>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${chel > 0 ? fmtMoney(chel) : '—'}</td>
               </tr>
@@ -2148,7 +2151,7 @@ async function generateAct() {
           ${birouExtra > 0 ? `
           <tr>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${entries.length + 1}.</td>
-            <td style="border:1px solid #000;padding:5px 6px;" colspan="4">Cheltuieli materiale de birou</td>
+            <td style="border:1px solid #000;padding:5px 6px;" colspan="5">Cheltuieli materiale de birou</td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${fmtMoney(birouExtra)}</td>
           </tr>` : ''}
           <tr style="font-weight:bold; background:#f8f8f8;">
@@ -2156,6 +2159,7 @@ async function generateAct() {
               TOTAL${contractNr ? ` (Contractul nr. ${contractNr})` : ''}:
             </td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${totalHours > 0 ? totalHours.toFixed(1) + ' ore' : '—'}</td>
+            <td style="border:1px solid #000;padding:5px 6px;text-align:center;">—</td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${fmtMoney(totalOnorariu)}</td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${totalCheltuieli + birouExtra > 0 ? fmtMoney(totalCheltuieli + birouExtra) : '—'}</td>
           </tr>
