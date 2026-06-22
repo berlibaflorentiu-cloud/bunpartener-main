@@ -640,6 +640,17 @@
   </div>
 </div>
 
+<!-- ══ PENDING SCREEN ══ -->
+<div id="pending-screen" style="display:none;min-height:100dvh;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);padding:40px 24px;text-align:center">
+  <div style="font-family:'Cormorant Garamond',serif;font-size:42px;letter-spacing:0.2em;color:var(--gold);margin-bottom:32px">PONTAJ</div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:36px 40px;max-width:400px;width:100%">
+    <div style="font-size:32px;margin-bottom:16px">⏳</div>
+    <div style="font-size:18px;font-weight:600;margin-bottom:10px">Cerere în așteptare</div>
+    <p style="color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:24px">Contul tău a fost creat și este în așteptarea aprobării din partea adminului. Revino mai târziu.</p>
+    <button class="btn-ghost" onclick="logout().then(()=>location.reload())">Deconectare</button>
+  </div>
+</div>
+
 <!-- ══ APP ══ -->
 <div id="app-shell">
   <header>
@@ -647,6 +658,7 @@
     <div class="header-right">
       <span class="header-user" id="headerUser"></span>
       <span id="header-mode-toggle"></span>
+      <span id="header-requests"></span>
       <button class="btn-ghost" onclick="logout()">Deconectare</button>
     </div>
   </header>
@@ -777,8 +789,7 @@ async function register() {
   });
   setAuthLoading('register', false);
   if (error) { showAuthMsg('register', error.message); return; }
-  showAuthMsg('register', 'Cont creat cu succes! Vă puteți autentifica.', 'success');
-  setTimeout(() => showTab('login'), 1800);
+  showAuthMsg('register', 'Cerere trimisă! Așteptați aprobarea adminului pentru a accesa aplicația.', 'success');
 }
 
 async function logout() {
@@ -855,13 +866,17 @@ async function refreshInBackground(userId) {
       db.from('entries').select('*').order('date', { ascending: false })
     ]);
     if (profileRes.data) {
+      const wasApproved = currentUser?.status === 'approved';
       currentUser = profileRes.data;
       localStorage.setItem('pontaj_profile', JSON.stringify(currentUser));
+      // If user just got approved while waiting on pending screen, show app
+      if (!wasApproved && currentUser.status === 'approved') { showApp(); return; }
     }
     allUsers   = usersRes.data   || [];
     allEntries = entriesRes.data || [];
     localStorage.setItem('pontaj_users_cache',   JSON.stringify(allUsers));
     localStorage.setItem('pontaj_entries_cache', JSON.stringify(allEntries));
+    updateRequestsBadge();
     render(); // Re-render silently with fresh data
   } catch (e) {
     // Silent — cached data already showing
@@ -871,20 +886,32 @@ async function refreshInBackground(userId) {
 function showLoginScreen() {
   clearTimeout(window._earlyTimeout);
   clearTimeout(window._cancelTimeout);
-  document.getElementById('loading-screen').style.display = 'none';
-  document.getElementById('auth-screen').style.display    = 'flex';
-  document.getElementById('app-shell').style.display      = 'none';
+  document.getElementById('loading-screen').style.display  = 'none';
+  document.getElementById('auth-screen').style.display     = 'flex';
+  document.getElementById('pending-screen').style.display  = 'none';
+  document.getElementById('app-shell').style.display       = 'none';
   document.getElementById('app-shell').classList.remove('visible');
   showTab('login');
 }
 
+function showPendingScreen() {
+  document.getElementById('loading-screen').style.display  = 'none';
+  document.getElementById('auth-screen').style.display     = 'none';
+  document.getElementById('pending-screen').style.display  = 'flex';
+  document.getElementById('app-shell').style.display       = 'none';
+  document.getElementById('app-shell').classList.remove('visible');
+}
+
 function showApp() {
-  document.getElementById('loading-screen').style.display = 'none';
-  document.getElementById('auth-screen').style.display    = 'none';
-  document.getElementById('app-shell').style.display      = '';
+  if (currentUser?.status === 'pending') { showPendingScreen(); return; }
+  document.getElementById('loading-screen').style.display  = 'none';
+  document.getElementById('auth-screen').style.display     = 'none';
+  document.getElementById('pending-screen').style.display  = 'none';
+  document.getElementById('app-shell').style.display       = '';
   document.getElementById('app-shell').classList.add('visible');
   document.getElementById('headerUser').textContent = currentUser.name;
   updateModeToggle();
+  updateRequestsBadge();
   render();
 }
 
@@ -938,6 +965,57 @@ const MONTHS = ['Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie',
 // ═══════════════════════════════════════
 // RENDER ROUTER
 // ═══════════════════════════════════════
+
+function updateRequestsBadge() {
+  const el = document.getElementById('header-requests');
+  if (!el || currentUser?.role !== 'admin') { if(el) el.innerHTML=''; return; }
+  const pending = allUsers.filter(u => u.status === 'pending');
+  el.innerHTML = `<button class="btn-ghost" onclick="showRequests()" style="position:relative">
+    Cereri${pending.length ? `<span style="position:absolute;top:-4px;right:-4px;background:var(--gold);color:var(--bg);border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1">${pending.length}</span>` : ''}
+  </button>`;
+}
+
+async function showRequests() {
+  const { data: pending } = await db.from('profiles').select('*').eq('status','pending').order('created_at');
+  const list = pending || [];
+  document.getElementById('modal-title').textContent = 'Cereri de acces';
+  document.getElementById('modal-actions').innerHTML = `<button class="btn-ghost" onclick="closeModal()">✕</button>`;
+  document.getElementById('modal-body').innerHTML = list.length === 0
+    ? `<div class="empty-state"><div class="empty-icon">✅</div><p>Nicio cerere în așteptare.</p></div>`
+    : `<div style="display:flex;flex-direction:column;gap:12px;padding:8px 0">
+        ${list.map(u => `
+          <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;gap:16px;flex-wrap:wrap">
+            <div>
+              <div style="font-weight:600;font-size:15px">${u.name}</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px">${u.created_at ? new Date(u.created_at).toLocaleDateString('ro-MD') : ''}</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn-primary" style="font-size:13px;padding:7px 18px" onclick="approveUser('${u.id}','${u.name}')">✓ Aprobă</button>
+              <button class="btn-ghost" style="font-size:13px;padding:7px 18px;border-color:#e05c5c;color:#e05c5c" onclick="denyUser('${u.id}','${u.name}')">✕ Respinge</button>
+            </div>
+          </div>`).join('')}
+      </div>`;
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+async function approveUser(id, name) {
+  const { error } = await db.from('profiles').update({ status: 'approved' }).eq('id', id);
+  if (error) { alert('Eroare: ' + error.message); return; }
+  allUsers = allUsers.map(u => u.id === id ? { ...u, status: 'approved' } : u);
+  localStorage.setItem('pontaj_users_cache', JSON.stringify(allUsers));
+  updateRequestsBadge();
+  showRequests();
+}
+
+async function denyUser(id, name) {
+  if (!confirm(`Respingi cererea lui ${name}? Contul va fi dezactivat.`)) return;
+  const { error } = await db.from('profiles').update({ status: 'denied' }).eq('id', id);
+  if (error) { alert('Eroare: ' + error.message); return; }
+  allUsers = allUsers.map(u => u.id === id ? { ...u, status: 'denied' } : u);
+  localStorage.setItem('pontaj_users_cache', JSON.stringify(allUsers));
+  updateRequestsBadge();
+  showRequests();
+}
 
 function toggleViewMode() {
   state.viewMode = state.viewMode === 'admin' ? 'avocat' : 'admin';
@@ -1252,7 +1330,7 @@ async function deleteEntry(id) {
 // ═══════════════════════════════════════
 
 function renderAdmin() {
-  const lawyers  = allUsers;
+  const lawyers  = allUsers.filter(u => u.status === 'approved' || !u.status);
   const userMap  = Object.fromEntries(allUsers.map(u => [u.id, u]));
 
   const periodEntries = filterEntries(allEntries, state.dateStart, state.dateEnd, null);
