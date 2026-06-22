@@ -33,8 +33,8 @@
     }
     .top-bar a { color: rgba(255,255,255,.7); text-decoration: none; font-size: 14px; }
     .top-bar a:hover { color: #fff; }
-    .top-bar .logo { font-family: var(--ff-serif); font-size: 22px; color: #fff; font-weight: 700; letter-spacing: .02em; }
-    .top-bar .logo span { color: #6fa3ef; }
+    .top-bar .logo { display: flex; align-items: center; }
+    .top-bar .logo img { height: 42px; width: auto; display: block; }
 
     /* ── Hero ── */
     .hero {
@@ -80,7 +80,7 @@
 <body>
 
 <nav class="top-bar">
-  <a href="/" class="logo">Bu<span>N</span>Partener</a>
+  <a href="/" class="logo" aria-label="BuNPartener – acasă"><img src="logoonly_transparent.png" alt="BuNPartener"></a>
   <a href="/">← Înapoi la site</a>
 </nav>
 
