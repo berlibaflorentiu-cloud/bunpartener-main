@@ -1487,7 +1487,7 @@ async function deleteActTemplate() {
   renderTemplateBar();
 }
 
-function generateAct() {
+async function generateAct() {
   const firm         = document.getElementById('rf-firm').value.trim();
   const coordinator  = document.getElementById('rf-coordinator').value.trim();
   const idno         = document.getElementById('rf-idno').value.trim();
@@ -1502,6 +1502,14 @@ function generateAct() {
                      lastContractNr: contractNr, lastContractDate: contractDate,
                      lastClient: clientName };
   localStorage.setItem('pontaj_settings', JSON.stringify(settings));
+
+  // Pre-fetch logo as base64 so html2canvas can render it
+  let logoSrc = '';
+  try {
+    const resp = await fetch('../logoBUN_transparent.png');
+    const blob = await resp.blob();
+    logoSrc = await new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(blob); });
+  } catch(e) { logoSrc = ''; }
 
   const now = new Date();
   const userMap = Object.fromEntries(allUsers.map(u => [u.id, u]));
@@ -1550,7 +1558,7 @@ function generateAct() {
       padding: 20px 28px; line-height: 1.5;
     ">
       <div style="display:flex;align-items:center;gap:20px;margin-bottom:18px;">
-        <img src="../logoBUN_transparent.png" style="height:72px;width:auto;object-fit:contain;flex-shrink:0">
+        ${logoSrc ? `<img src="${logoSrc}" style="height:72px;width:auto;object-fit:contain;flex-shrink:0">` : ''}
         <div style="flex:1;text-align:center;">
           <div style="font-size:15pt; font-weight:bold; letter-spacing:0.05em;">ACT</div>
           <div style="font-weight:bold;">DE PREDARE-PRIMIRE A SERVICIILOR JURIDICE PRESTATE</div>
