@@ -2038,7 +2038,11 @@ async function generateAct() {
   const userMap = Object.fromEntries(allUsers.map(u => [u.id, u]));
 
   const entries = filterEntries(allEntries, state.dateStart, state.dateEnd, null)
-                    .filter(e => state.filterUser === 'group' && state.customGroup.length ? state.customGroup.includes(e.user_id) : true)
+                    .filter(e =>
+                      state.filterUser === 'group'  ? (state.customGroup.length ? state.customGroup.includes(e.user_id) : true) :
+                      state.filterUser === 'all'    ? true :
+                      e.user_id === state.filterUser
+                    )
                     .filter(e => clientMatches(e.client, clientName))
                     .sort((a,b) => a.date.localeCompare(b.date));
 
