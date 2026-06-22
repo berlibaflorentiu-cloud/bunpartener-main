@@ -981,7 +981,7 @@ function confirmDeleteUser(id, name, entryCount) {
 }
 
 async function deleteUser(id, name) {
-  const { error } = await db.from('profiles').delete().eq('id', id);
+  const { error } = await db.rpc('delete_user_account', { user_id: id });
   if (error) { alert('Eroare la ștergere: ' + error.message); return; }
   allUsers = allUsers.filter(u => u.id !== id);
   allEntries = allEntries.filter(e => e.user_id !== id);
