@@ -336,6 +336,7 @@
       border-bottom: 1px solid var(--border);
     }
     .table-title { font-size: 13px; font-weight: 600; }
+    .reg-total-badge { font-size: 12px; color: var(--gold); font-weight: 600; background: rgba(201,162,77,.1); border: 1px solid rgba(201,162,77,.3); border-radius: 6px; padding: 4px 10px; }
     table { width: 100%; border-collapse: collapse; }
     th {
       text-align: left;
@@ -2165,8 +2166,8 @@ function renderClienti(container) {
           <input type="text" id="c-name" placeholder="ex. SC Alpha SRL" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')addClient()">
         </div>
         <div class="field">
-          <label>Note (opțional)</label>
-          <input type="text" id="c-notes" placeholder="ex. nr. contract, persoană de contact" autocorrect="off" onkeydown="if(event.key==='Enter')addClient()">
+          <label>Nr. Contract</label>
+          <input type="text" id="c-contract" placeholder="ex. VB-17.285/03-24" autocorrect="off" onkeydown="if(event.key==='Enter')addClient()">
         </div>
         <button class="btn-primary" id="btn-add-client" onclick="addClient()" style="padding:9px 22px">Adaugă</button>
       </div>
@@ -2200,12 +2201,12 @@ async function addClient() {
   const nameEl = document.getElementById('c-name');
   const name   = nameEl?.value.trim();
   if (!name) { nameEl?.focus(); return; }
-  const notes = document.getElementById('c-notes')?.value.trim() || null;
+  const contractNr = document.getElementById('c-contract')?.value.trim() || null;
   const btn = document.getElementById('btn-add-client');
   if (btn) { btn.disabled = true; btn.textContent = '...'; }
 
   const { data, error } = await db.from('clients')
-    .insert({ name, notes, created_by: currentUser.id })
+    .insert({ name, notes: contractNr, created_by: currentUser.id })
     .select().single();
   if (btn) { btn.disabled = false; btn.textContent = 'Adaugă'; }
   if (error) { alert(error.message); return; }
@@ -2265,7 +2266,18 @@ function pickClientAc(i) {
   if (!c || !_cac.inputEl) return;
   _cac.inputEl.value = c.name;
   _cac.inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+  autofillContractNr(_cac.inputEl, c);
   closeClientAc();
+}
+
+// Auto-fills the matching contract-number field when a client is picked
+// from the autocomplete dropdown, in the tabs that have one.
+const CONTRACT_NR_TARGETS = { 'inv-client': 'inv-notes', 'rg-client': 'rg-contract', 'rf-client': 'rf-contract-nr' };
+function autofillContractNr(inputEl, client) {
+  const targetId = CONTRACT_NR_TARGETS[inputEl.id];
+  if (!targetId || !client.notes) return;
+  const target = document.getElementById(targetId);
+  if (target) target.value = client.notes;
 }
 
 function closeClientAc() {
@@ -2472,7 +2484,10 @@ function renderRegistru(container) {
 
     <div class="table-wrap">
       <div class="table-header">
-        <span class="table-title">Registru chitanțe (${sorted.length})</span>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="table-title">Registru chitanțe (${sorted.length})</span>
+          ${sorted.length ? `<span class="reg-total-badge">Total plată de bază: ${fmtMoney(sorted.reduce((s,r) => s + (Number(r.plata_baza)||0), 0))}</span>` : ''}
+        </div>
         ${sorted.length ? `<button class="btn-ghost" onclick="exportRegistruCSV()" style="font-size:12px">↓ Export CSV</button>` : ''}
       </div>
       ${sorted.length === 0
@@ -2616,7 +2631,7 @@ function exportRegistruCSV() {
   const header = ['Nr.','Seria si Nr.','Data','Nume Prenume Client','Cod Personal','Nr. Contract','Plata de baza (MDL)','Compensare cheltuieli (MDL)','Total bon (MDL)','Semnat client','Prezent contabilitate'];
   const rows   = sorted.map((r,i) => {
     const total = (Number(r.plata_baza)||0) + (Number(r.compensare)||0);
-    return [i+1, r.serie_nr, fmtDate(r.date), r.client_name, r.cod_personal||'', r.contract_nr||'',
+    return [i+1, r.serie_nr, fmtDate(r.date), r.client_name, r.cod_personal ? `="${r.cod_personal}"` : '', r.contract_nr||'',
       Number(r.plata_baza).toFixed(2), Number(r.compensare).toFixed(2), total.toFixed(2),
       r.semnat?'DA':'NU', r.contabilitate?'DA':'NU'];
   });
