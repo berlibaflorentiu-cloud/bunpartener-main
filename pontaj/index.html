@@ -979,7 +979,7 @@ function initDateRange() {
   };
 }
 const _dr = initDateRange();
-const state = { dateStart: _dr.start, dateEnd: _dr.end, filterUser: 'all', viewMode: 'admin', customGroup: [], adminTab: 'pontaj', clientiSearch: '', registruSearch: '' };
+const state = { dateStart: _dr.start, dateEnd: _dr.end, filterUser: 'all', viewMode: 'admin', customGroup: [], adminTab: 'pontaj', clientiSearch: '', clientiStatus: 'all', registruSearch: '' };
 
 const PRESETS = [
   { label: 'Întrevederea la Penitenciar',              price: 1500, type: 'onorariu' },
@@ -2245,9 +2245,13 @@ function _initCharts(months, topClients) {
 // ── Tab: Clienți (admin only) ─────────────────────────────
 function renderClienti(container) {
   const q = (state.clientiSearch || '').trim().toLowerCase();
-  const filteredClients = !q ? allClients : allClients.filter(c =>
-    c.name.toLowerCase().includes(q) || (c.notes || '').toLowerCase().includes(q)
-  );
+  const sf = state.clientiStatus || 'all';
+  const filteredClients = allClients.filter(c => {
+    if (q && !c.name.toLowerCase().includes(q) && !(c.notes || '').toLowerCase().includes(q)) return false;
+    if (sf === 'active'    &&  isClientFinalized(c)) return false;
+    if (sf === 'finalized' && !isClientFinalized(c)) return false;
+    return true;
+  });
 
   container.innerHTML = `
     <div class="add-form" style="margin-bottom:28px">
@@ -2266,6 +2270,13 @@ function renderClienti(container) {
     </div>
 
     ${allClients.length === 0 ? '' : `
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      ${['all','active','finalized'].map(s => {
+        const label = s === 'all' ? 'Toți' : s === 'active' ? 'Activi' : 'Finalizați';
+        const active = (state.clientiStatus||'all') === s;
+        return `<button onclick="filterClientiStatus('${s}')" style="padding:5px 12px;border-radius:20px;border:1px solid ${active ? 'var(--gold)' : 'var(--border)'};background:${active ? 'rgba(var(--gold-rgb,180,145,80),.15)' : 'transparent'};color:${active ? 'var(--gold)' : 'var(--muted)'};font-size:12px;cursor:pointer;transition:all .15s">${label}</button>`;
+      }).join('')}
+    </div>
     <div class="search-bar">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" id="clienti-search" placeholder="Caută client sau nr. contract..." value="${esc(state.clientiSearch||'')}" oninput="searchClienti(this)" autocomplete="off">
@@ -2278,19 +2289,27 @@ function renderClienti(container) {
       ? `<div class="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.3;margin-bottom:12px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><p>Niciun client găsit pentru "${esc(state.clientiSearch)}".</p></div>`
       : `<div class="lawyer-grid">
           ${filteredClients.map(c => {
-            const cnt    = allEntries.filter(e => clientMatches(e.client, c.name)).length;
-            const invCt  = allInvoices.filter(i => i.client_name && i.client_name.toLowerCase().includes(c.name.toLowerCase().slice(0,5))).length;
-            const rcptCt = allReceipts.filter(r => receiptBelongsToClient(r, c)).length;
+            const cnt      = allEntries.filter(e => clientMatches(e.client, c.name)).length;
+            const invCt    = allInvoices.filter(i => i.client_name && i.client_name.toLowerCase().includes(c.name.toLowerCase().slice(0,5))).length;
+            const rcptCt   = allReceipts.filter(r => receiptBelongsToClient(r, c)).length;
+            const done     = isClientFinalized(c);
+            const dispName = c.name.replace(/\s*-\s*FINALIZAT\s*$/i, '').trim();
+            const checkIcon = done
+              ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`
+              : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>`;
             return `
-              <div class="lsc" data-client-id="${c.id}" style="position:relative;cursor:pointer" onclick="showClientReceipts('${c.id}', event)">
+              <div class="lsc" data-client-id="${c.id}" style="position:relative;cursor:pointer;opacity:${done ? '.6' : '1'}" onclick="showClientReceipts('${c.id}', event)">
                 <div class="lsc-actions" style="position:absolute;top:7px;right:8px;display:flex;gap:4px;align-items:center">
+                  <button onclick="toggleClientStatus('${c.id}',event)" title="${done ? 'Marchează activ' : 'Marchează finalizat'}"
+                    style="background:none;border:none;color:${done ? 'var(--green,#5cb85c)' : 'var(--muted)'};cursor:pointer;padding:3px 5px;border-radius:4px;line-height:1;transition:color .15s,background .15s"
+                    onmouseover="this.style.background='rgba(128,128,128,.12)'" onmouseout="this.style.background='none'">${checkIcon}</button>
                   <button class="btn-edit" onclick="editClient('${c.id}');event.stopPropagation()" title="Editează" style="padding:4px 6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
                   <button onclick="deleteClient('${c.id}');event.stopPropagation()" title="Șterge"
                     style="background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;line-height:1;padding:2px 5px;border-radius:4px;transition:color .15s,background .15s"
                     onmouseover="this.style.color='#e05c5c';this.style.background='rgba(224,92,92,.12)'"
                     onmouseout="this.style.color='var(--muted)';this.style.background='none'">✕</button>
                 </div>
-                <div class="lsc-name" style="padding-right:44px;font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--gold);letter-spacing:-.01em">${esc(c.name)}</div>
+                <div class="lsc-name" style="padding-right:60px;font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--gold);letter-spacing:-.01em">${esc(dispName)}</div>
                 <div class="lsc-contract" style="font-size:12px;color:var(--muted);margin-top:2px;margin-bottom:10px;line-height:1.4">${c.notes ? esc(c.notes) : '—'}</div>
                 <div class="lsc-row"><span>Intrări</span><span>${cnt}</span></div>
                 <div class="lsc-row"><span>Facturi</span><span>${invCt}</span></div>
@@ -2319,6 +2338,28 @@ async function addClient() {
   allClients.push(data);
   allClients.sort((a,b) => a.name.localeCompare(b.name));
   _refreshClientDatalist();
+  renderAdminTabContent();
+}
+
+function isClientFinalized(c) {
+  return /\s*-\s*FINALIZAT\s*$/i.test(c.name);
+}
+
+function filterClientiStatus(s) {
+  state.clientiStatus = s;
+  renderAdminTabContent();
+}
+
+async function toggleClientStatus(id, event) {
+  if (event) event.stopPropagation();
+  const c = allClients.find(x => x.id === id);
+  if (!c) return;
+  const newName = isClientFinalized(c)
+    ? c.name.replace(/\s*-\s*FINALIZAT\s*$/i, '').trim()
+    : c.name.trim() + ' - FINALIZAT';
+  const { error } = await db.from('clients').update({ name: newName }).eq('id', id);
+  if (error) { alert(error.message); return; }
+  allClients = allClients.map(x => x.id === id ? { ...x, name: newName } : x);
   renderAdminTabContent();
 }
 
