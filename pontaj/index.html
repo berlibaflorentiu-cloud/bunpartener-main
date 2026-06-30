@@ -2368,7 +2368,7 @@ async function saveClientEdit(id) {
 
 function _refreshClientDatalist() { /* noop — kept for call-site compatibility */ }
 
-const _cac = { items: [], idx: -1, inputEl: null };
+const _cac = { items: [], idx: -1, inputEl: null, mode: 'client' };
 
 function clientAcInput(inputEl) {
   const ac  = document.getElementById('client-ac');
@@ -2385,6 +2385,7 @@ function clientAcInput(inputEl) {
   _cac.items   = matches;
   _cac.idx     = -1;
   _cac.inputEl = inputEl;
+  _cac.mode    = 'client';
 
   const r = inputEl.getBoundingClientRect();
   ac.style.top   = (r.bottom + 2) + 'px';
@@ -2420,21 +2421,46 @@ function autofillContractNr(inputEl, client) {
   if (target) target.value = client.notes;
 }
 
-// Reverse: auto-fills the client name field when a contract number is typed
-// and it matches a known client's notes field (substring match both ways).
+// Reverse: dropdown autocomplete for contract-number fields.
+// Searching "424" matches "nr. VB-19.424/05-25 din 12 mai 2025" via substring.
+// Picking from the dropdown fills both the contract field and the client name field.
 const CLIENT_FROM_CONTRACT = { 'rg-contract': 'rg-client', 'rf-contract-nr': 'rf-client', 'inv-notes': 'inv-client' };
-function autofillClientName(el) {
-  const targetId = CLIENT_FROM_CONTRACT[el.id];
-  if (!targetId) return;
-  const val = el.value.trim().toLowerCase();
-  if (!val || val.length < 5) return;
-  const match = allClients.find(c => {
-    if (!c.notes) return false;
-    const cn = c.notes.trim().toLowerCase();
-    return cn.includes(val) || val.includes(cn);
-  });
-  const target = document.getElementById(targetId);
-  if (match && target) target.value = match.name;
+function contractAcInput(inputEl) {
+  const ac = document.getElementById('client-ac');
+  if (!ac) return;
+  const val = inputEl.value.trim().toLowerCase();
+  if (!val || val.length < 2 || !allClients.length) { closeClientAc(); return; }
+  const matches = allClients
+    .filter(c => c.notes && c.notes.toLowerCase().includes(val))
+    .slice(0, 8);
+  if (!matches.length) { closeClientAc(); return; }
+  _cac.items   = matches;
+  _cac.idx     = -1;
+  _cac.inputEl = inputEl;
+  _cac.mode    = 'contract';
+  const r = inputEl.getBoundingClientRect();
+  ac.style.top   = (r.bottom + 2) + 'px';
+  ac.style.left  = r.left + 'px';
+  ac.style.width = r.width + 'px';
+  ac.innerHTML = matches.map((c, i) => `
+    <div class="desc-ac-item" data-i="${i}"
+      onmousedown="pickContractAc(${i})"
+      onmouseover="_cac.idx=${i};_highlightClientAc()">
+      <span class="desc-ac-label">${esc(c.notes)}</span>
+      <span class="desc-ac-price" style="font-size:11px">${esc(c.name)}</span>
+    </div>
+  `).join('');
+  ac.style.display = 'block';
+}
+
+function pickContractAc(i) {
+  const c = _cac.items[i];
+  if (!c || !_cac.inputEl) return;
+  _cac.inputEl.value = c.notes;
+  const nameId = CLIENT_FROM_CONTRACT[_cac.inputEl.id];
+  const nameEl = nameId && document.getElementById(nameId);
+  if (nameEl) nameEl.value = c.name;
+  closeClientAc();
 }
 
 function closeClientAc() {
@@ -2461,7 +2487,8 @@ function clientAcKeydown(e) {
     _highlightClientAc();
   } else if (e.key === 'Enter' && _cac.idx >= 0) {
     e.preventDefault();
-    pickClientAc(_cac.idx);
+    if (_cac.mode === 'contract') pickContractAc(_cac.idx);
+    else pickClientAc(_cac.idx);
   } else if (e.key === 'Escape') {
     closeClientAc();
   }
@@ -2546,7 +2573,7 @@ function openCreateInvoice() {
       </div>
       <div class="field">
         <label>Note (opțional)</label>
-        <input type="text" id="inv-notes" class="auth-input" placeholder="ex. nr. contract, observații..." style="background:var(--bg)" oninput="autofillClientName(this)">
+        <input type="text" id="inv-notes" class="auth-input" placeholder="ex. nr. contract, observații..." style="background:var(--bg)" oninput="contractAcInput(this)" onkeydown="clientAcKeydown(event)" onblur="setTimeout(closeClientAc,200)">
       </div>
       <div style="background:var(--surface2);border-radius:8px;padding:14px">
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px">Intrări de inclus</div>
@@ -2716,7 +2743,7 @@ function renderRegistru(container) {
         </div>
         <div class="field">
           <label>Nr. Contractului</label>
-          <input type="text" id="rg-contract" placeholder="ex. VB-17.285/03-24" autocomplete="off" oninput="autofillClientName(this)">
+          <input type="text" id="rg-contract" placeholder="ex. VB-17.285/03-24" autocomplete="off" oninput="contractAcInput(this)" onkeydown="clientAcKeydown(event)" onblur="setTimeout(closeClientAc,200)">
         </div>
         <div class="field">
           <label>Plată de bază (MDL)</label>
@@ -3108,7 +3135,7 @@ async function showReportForm() {
       <div style="display:flex;gap:12px">
         <div class="field" style="flex:1">
           <label>Nr. contract</label>
-          <input type="text" id="rf-contract-nr" value="${settings.lastContractNr || ''}" placeholder="ex. VB-19.503/04-26" oninput="autofillClientName(this)">
+          <input type="text" id="rf-contract-nr" value="${settings.lastContractNr || ''}" placeholder="ex. VB-19.503/04-26" oninput="contractAcInput(this)" onkeydown="clientAcKeydown(event)" onblur="setTimeout(closeClientAc,200)">
         </div>
         <div class="field" style="flex:1">
           <label>Data contractului</label>
