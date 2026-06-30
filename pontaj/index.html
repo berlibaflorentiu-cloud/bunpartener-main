@@ -2235,13 +2235,16 @@ function editClient(id) {
   const c = allClients.find(x => x.id === id);
   if (!c) return;
   card.dataset.editing = '1';
+  const actions = card.querySelector('.lsc-actions');
+  if (actions) actions.style.display = 'none';
   card.querySelector('.lsc-name').outerHTML =
-    `<input class="tei" type="text" value="${esc(c.name)}" data-f="name" style="width:100%;margin-bottom:4px;padding-right:44px" onkeydown="if(event.key==='Enter')saveClientEdit('${id}')">`;
+    `<input class="tei" type="text" value="${esc(c.name)}" data-f="name" style="width:100%;margin-bottom:6px" onkeydown="if(event.key==='Enter')saveClientEdit('${id}')">`;
   card.querySelector('.lsc-contract').outerHTML =
-    `<input class="tei" type="text" value="${esc(c.notes||'')}" data-f="notes" placeholder="Nr. Contract" style="width:100%;margin-bottom:10px;font-size:12px" onkeydown="if(event.key==='Enter')saveClientEdit('${id}')">`;
-  card.querySelector('.lsc-actions').innerHTML = `
-    <button class="btn-edit-save" onclick="saveClientEdit('${id}')" title="Salvează">✓</button>
-    <button class="btn-edit-cancel" onclick="renderAdminTabContent()" title="Anulează">✕</button>`;
+    `<input class="tei" type="text" value="${esc(c.notes||'')}" data-f="notes" placeholder="Nr. Contract" style="width:100%;margin-bottom:8px;font-size:12px" onkeydown="if(event.key==='Enter')saveClientEdit('${id}')">
+     <div class="lsc-edit-actions" style="display:flex;gap:6px;margin-bottom:10px">
+       <button class="btn-edit-save" onclick="saveClientEdit('${id}')" title="Salvează">✓ Salvează</button>
+       <button class="btn-edit-cancel" onclick="renderAdminTabContent()" title="Anulează">✕ Anulează</button>
+     </div>`;
 }
 
 async function saveClientEdit(id) {
