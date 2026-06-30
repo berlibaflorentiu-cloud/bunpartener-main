@@ -1238,6 +1238,7 @@
     .cf-tab.active { background:var(--white); color:var(--navy); }
     .cf-panel { display:none; }
     .cf-panel.active { display:block; animation:fadeTab .35s ease; }
+    #calendly-mount { border-radius:10px; overflow:hidden; background:#0d1b35; }
     .cf-soon {
       text-align:center; padding:60px 24px; color:rgba(255,255,255,.62);
       border:1px dashed rgba(255,255,255,.16); border-radius:12px;
@@ -1266,41 +1267,6 @@
 
     .fsub { width:100%; justify-content:center; padding:15px 28px; font-size:15px; margin-top:4px; }
     .fpriv { font-size:11px; color:rgba(255,255,255,.22); margin-top:14px; text-align:center; }
-
-    /* ── Calendly-style calendar picker ── */
-    .cal-dur-wrap { display:flex; gap:8px; margin-bottom:22px; }
-    .cal-dur-btn, .cal-type-btn { flex:1; padding:9px 6px; border:1px solid rgba(255,255,255,.18); border-radius:8px; background:none; color:rgba(255,255,255,.65); font-family:inherit; font-size:13px; font-weight:500; cursor:pointer; transition:all .15s; text-align:center; }
-    .cal-dur-btn:hover, .cal-type-btn:hover { border-color:rgba(255,255,255,.4); color:#fff; background:rgba(255,255,255,.06); }
-    .cal-dur-btn.selected, .cal-type-btn.selected { border-color:#1d4ed8; background:rgba(29,78,216,.25); color:#fff; font-weight:600; }
-    .cal-tz-note { font-size:11.5px; color:rgba(255,255,255,.38); margin:0 0 18px; text-align:center; }
-    .cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; }
-    .cal-nav-btn { width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:none; border:none; color:rgba(255,255,255,.5); cursor:pointer; border-radius:50%; transition:background .15s,color .15s; flex-shrink:0; }
-    .cal-nav-btn:hover:not(:disabled) { background:rgba(255,255,255,.1); color:#fff; }
-    .cal-nav-btn:disabled { opacity:.2; cursor:default; }
-    .cal-month-label { font-size:16px; font-weight:600; color:#fff; letter-spacing:.01em; }
-    .cal-dow { display:grid; grid-template-columns:repeat(7,1fr); text-align:center; margin-bottom:4px; }
-    .cal-dow span { font-size:11px; font-weight:600; color:rgba(255,255,255,.28); letter-spacing:.05em; padding:5px 0; }
-    .cal-days { display:grid; grid-template-columns:repeat(7,1fr); }
-    .cal-day, .cal-day-empty { aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:14px; border-radius:50%; }
-    .cal-day-empty { visibility:hidden; }
-    .cal-day { background:none; border:none; font-family:inherit; color:rgba(255,255,255,.18); cursor:default; position:relative; }
-    .cal-day.avail { color:rgba(255,255,255,.82); cursor:pointer; transition:background .15s,color .15s; }
-    .cal-day.avail:hover { background:rgba(255,255,255,.11); color:#fff; }
-    .cal-day.is-today::after { content:''; position:absolute; bottom:4px; left:50%; transform:translateX(-50%); width:3px; height:3px; border-radius:50%; background:#6a9bff; }
-    .cal-day.selected { background:#1d4ed8 !important; color:#fff !important; font-weight:700; }
-    .cal-times-wrap { animation:fadeTab .2s ease; }
-    .cal-times-loading, .cal-times-empty { font-size:13.5px; color:rgba(255,255,255,.4); padding:14px 0; text-align:center; }
-    .cal-times-label { font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.4); margin-bottom:12px; }
-    .cal-times { display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto; scrollbar-width:none; }
-    .cal-times::-webkit-scrollbar { display:none; }
-    .cal-slot { padding:11px 20px; background:transparent; border:1px solid rgba(255,255,255,.2); border-radius:7px; color:#fff; font-family:inherit; font-size:14px; font-weight:500; cursor:pointer; text-align:center; transition:all .15s; }
-    .cal-slot:hover { border-color:rgba(255,255,255,.55); background:rgba(255,255,255,.06); }
-    .cal-slot.selected { background:#1d4ed8; border-color:#1d4ed8; }
-    .cal-next-btn { display:none; width:100%; margin-top:20px; justify-content:center; padding:14px 28px; font-size:15px; }
-    .cal-next-btn.vis { display:flex; animation:fadeTab .2s ease; }
-    .cal-back { display:inline-flex; align-items:center; gap:6px; background:none; border:none; color:rgba(255,255,255,.45); font-family:inherit; font-size:13px; cursor:pointer; padding:0 0 16px; transition:color .15s; }
-    .cal-back:hover { color:#fff; }
-    .cal-summary { background:rgba(29,78,216,.18); border:1px solid rgba(29,78,216,.45); border-radius:10px; padding:13px 16px; margin-bottom:22px; font-size:13.5px; color:rgba(255,255,255,.75); line-height:1.5; }
 
     /* ─── Footer ─────────────────────────────────────── */
     footer { background: #070e1c; padding: 56px 0 28px; }
@@ -2948,107 +2914,10 @@
         </div>
 
         <div class="cf-panel active" id="panel-book" role="tabpanel" aria-labelledby="tab-book">
-
-          <!-- Step 1: Pick a day and time -->
-          <div id="cal-step1">
-            <div class="cal-dur-wrap">
-              <button type="button" class="cal-type-btn selected" data-type="telefonic">📞 Telefonic</button>
-              <button type="button" class="cal-type-btn" data-type="birou">📍 La birou</button>
-            </div>
-            <div class="cal-dur-wrap">
-              <button type="button" class="cal-dur-btn selected" data-dur="30">30 min</button>
-              <button type="button" class="cal-dur-btn" data-dur="60">1 oră</button>
-              <button type="button" class="cal-dur-btn" data-dur="120">2 ore</button>
-            </div>
-            <p class="cal-tz-note">Orele afișate sunt ora Chișinăului (GMT+2/GMT+3)</p>
-            <div id="cal-grid">
-              <div class="cal-nav">
-                <button type="button" class="cal-nav-btn" id="cal-prev" aria-label="Luna anterioară">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-                </button>
-                <span class="cal-month-label" id="cal-month-label"></span>
-                <button type="button" class="cal-nav-btn" id="cal-next-month" aria-label="Luna următoare">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                </button>
-              </div>
-              <div class="cal-dow">
-                <span>Lu</span><span>Ma</span><span>Mi</span><span>Jo</span><span>Vi</span><span>Sâ</span><span>Du</span>
-              </div>
-              <div class="cal-days" id="cal-days"></div>
-            </div>
-
-            <div class="cal-times-wrap" id="cal-times-wrap" style="display:none">
-              <button type="button" class="cal-back" id="cal-change-date">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-                Schimbă data
-              </button>
-              <div class="cal-times-label" id="cal-times-label"></div>
-              <div class="cal-times" id="cal-times"></div>
-            </div>
-
-            <button type="button" class="btn-w fsub cal-next-btn" id="cal-next-step">
-              <span>Continuă</span>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </button>
-          </div>
-
-          <!-- Step 2: Personal details -->
-          <div id="cal-step2" style="display:none">
-            <form id="bform" novalidate>
-              <input type="hidden" name="access_key" value="87a99977-1f60-4668-bef5-5bf556d4341a">
-              <input type="hidden" name="subject" value="Solicitare programare întâlnire — bunpartener.md">
-              <input type="hidden" name="from_name" value="Website BunPartener">
-              <input type="checkbox" name="botcheck" tabindex="-1" autocomplete="off" style="display:none" aria-hidden="true">
-              <input type="hidden" id="bdate-h" name="preferred_date">
-              <input type="hidden" id="btime-h" name="preferred_time">
-              <input type="hidden" id="bdur-h" name="preferred_duration">
-              <input type="hidden" id="bdurmin-h" name="preferred_duration_minutes">
-              <input type="hidden" id="bappt-h" name="appointment_time_readable">
-              <input type="hidden" id="btype-h" name="meeting_type">
-
-              <button type="button" class="cal-back" id="cal-back-btn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-                Înapoi la calendar
-              </button>
-
-              <div class="cal-summary" id="cal-summary"></div>
-
-              <div class="frow">
-                <div class="fg">
-                  <label for="bname" class="fl">Nume complet <span class="req">*</span></label>
-                  <input type="text" id="bname" name="name" class="fi" placeholder="Ion Ionescu" required autocomplete="name">
-                </div>
-                <div class="fg">
-                  <label for="bphone" class="fl">Telefon <span class="req">*</span></label>
-                  <input type="tel" id="bphone" name="phone" class="fi" placeholder="+373 6X XXX XXX" required autocomplete="tel">
-                </div>
-              </div>
-              <div class="fg">
-                <label for="bemail" class="fl">Email</label>
-                <input type="email" id="bemail" name="email" class="fi" placeholder="email@exemplu.com" autocomplete="email">
-              </div>
-              <div class="fg">
-                <label for="bservice" class="fl">Domeniu juridic</label>
-                <select id="bservice" name="service" class="fsel fi">
-                  <option value="">Selectați domeniul...</option>
-                  <option>Drept Corporativ</option><option>Drept Penal</option><option>Drept de Familie</option>
-                  <option>Dreptul Muncii</option><option>Protecția Consumatorilor</option><option>Drept Comercial</option>
-                  <option>Imobiliare &amp; Proprietate</option><option>Cereri la CtEDO</option>
-                  <option>Drept de Autor</option><option>Drept Administrativ</option><option>Altele</option>
-                </select>
-              </div>
-              <div class="fg">
-                <label for="bnotes" class="fl">Scurtă descriere <span style="font-weight:400;opacity:.55">(opțional)</span></label>
-                <textarea id="bnotes" name="message" class="fta" placeholder="Descrieți pe scurt situația juridică..."></textarea>
-              </div>
-              <button type="submit" class="btn-w fsub" id="bsub">
-                <span>Confirmă programarea</span>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-              </button>
-              <p class="fpriv">Datele dvs. sunt confidențiale și protejate conform GDPR.</p>
-            </form>
-          </div>
-
+          <!-- Calendly inline scheduler. SETUP: paste your Calendly link into the
+               CALENDLY_URL variable in the <script> near the end of this file.
+               Your available hours are configured in the Calendly dashboard, not here. -->
+          <div id="calendly-mount"></div>
         </div>
 
         <div class="cf-panel" id="panel-msg" role="tabpanel" aria-labelledby="tab-msg">
@@ -3108,43 +2977,6 @@
 </div><!-- /bleed-aurora -->
 
 <script>
-/* Google Apps Script Web App URL — see deployment instructions. Leave the
-   placeholder as-is until deployed; availability checks and calendar sync
-   are skipped silently when it isn't configured. */
-const GCAL_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwxwB6wtVcc7PpuKJTE5TRuZNuYC9zg7mhKe8rvpclKJ5KXlrFIc459Y5gv9-NjCTw63A/exec';
-/* Must match SHARED_SECRET in the Apps Script. This only filters out generic
-   bots/scanners — anyone who reads view-source can see it too — real abuse
-   resistance comes from the server-side validation + rate limit. */
-const GCAL_SECRET = '9665a63184b8e20e1f0b3e7699e345b74528b1e5';
-
-const MOLDOVA_TZ = 'Europe/Chisinau';
-
-// All booking times are anchored to Chișinău time, regardless of the visitor's
-// own device timezone — converts using Intl so DST (EET/EEST) is handled correctly.
-function moldovaOffsetMs(utcDate) {
-  const fmt = new Intl.DateTimeFormat('en-US', {
-    timeZone: MOLDOVA_TZ, year:'numeric', month:'2-digit', day:'2-digit',
-    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
-  });
-  const p = {};
-  fmt.formatToParts(utcDate).forEach(x => { if (x.type !== 'literal') p[x.type] = x.value; });
-  if (p.hour === '24') p.hour = '00';
-  const asUtcMs = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
-  return asUtcMs - utcDate.getTime();
-}
-
-function moldovaWallToDate(dateStr, timeStr) {
-  const roughUtcMs = Date.parse(dateStr + 'T' + timeStr + ':00Z');
-  const offsetMs = moldovaOffsetMs(new Date(roughUtcMs));
-  return new Date(roughUtcMs - offsetMs);
-}
-
-function moldovaTodayParts() {
-  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: MOLDOVA_TZ, year:'numeric', month:'2-digit', day:'2-digit' });
-  const [y, m, d] = fmt.format(new Date()).split('-').map(Number);
-  return { y, m: m - 1, d };
-}
-
 /* ── Contact: tab toggle (schedule a meeting / send a message) ── */
 (function () {
   var tabs = Array.prototype.slice.call(document.querySelectorAll('.cf-tab'));
@@ -3164,239 +2996,55 @@ function moldovaTodayParts() {
   });
 })();
 
-  /* ── Calendar picker (Calendly-style, step 1) ── */
-  (function () {
-    const MONTHS = ['Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie'];
-    const DOW_RO  = ['Duminică','Luni','Marți','Miercuri','Joi','Vineri','Sâmbătă'];
-    const SLOTS   = {
-      1:['09:00','10:00','11:00','12:00','14:00','15:00','16:00','17:00'],
-      2:['09:00','10:00','11:00','12:00','14:00','15:00','16:00','17:00'],
-      3:['09:00','10:00','11:00','12:00','14:00','15:00','16:00','17:00'],
-      4:['09:00','10:00','11:00','12:00','14:00','15:00','16:00','17:00'],
-      5:['09:00','10:00','11:00','12:00','14:00','15:00','16:00','17:00'],
-      6:['10:00','11:00','12:00','13:00'],
-    };
-    const todayParts = moldovaTodayParts();
-    const today = new Date(todayParts.y, todayParts.m, todayParts.d);
-    let vY = todayParts.y, vM = todayParts.m;
-    const MIN_LEAD_HOURS = 2; // appointments must start at least this many hours from now
-    let selDate = null, selDow = null, selTime = null, selDur = 30, selType = 'telefonic';
-    let monthBusyCache = { key: null, promise: null, busy: [] };
+/* ── Contact: Calendly inline scheduler ──────────────────────────────
+   ▸ SETUP: paste your Calendly link between the quotes below, e.g.
+       var CALENDLY_URL = "https://calendly.com/bunpartener/consultatie";
+   ▸ Leave it empty ("") to show a tasteful "coming soon" notice instead.
+   ▸ Available hours, meeting length, timezone, reminders and calendar
+     sync are all configured in your Calendly dashboard — not in this file. */
+(function () {
+  var CALENDLY_URL = "https://calendly.com/office-bunpartener/30min";
 
-    function monthKey(y, m) { return y + '-' + p2(m + 1); }
+  var mount = document.getElementById('calendly-mount');
+  if (!mount) return;
 
-    async function fetchBusyRange(startStr, endStr) {
-      if (!GCAL_ENDPOINT || GCAL_ENDPOINT.indexOf('PASTE_YOUR') !== -1) return [];
-      try {
-        const res  = await fetch(GCAL_ENDPOINT + '?start=' + startStr + '&end=' + endStr + '&token=' + encodeURIComponent(GCAL_SECRET));
-        const json = await res.json();
-        return (json.busy || []).map(b => ({ start: new Date(b.start), end: new Date(b.end) }));
-      } catch { return []; }
-    }
+  if (!CALENDLY_URL) {
+    mount.innerHTML =
+      '<div class="cf-soon">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>' +
+        '<p>Programarea online va fi disponibilă în curând.</p>' +
+        '<p class="cf-soon-sub">Între timp, sunați-ne la +373 60 300 165 sau folosiți fila „Trimite un mesaj”.</p>' +
+      '</div>';
+    return;
+  }
 
-    function loadMonthBusy(y, m) {
-      const key = monthKey(y, m);
-      if (monthBusyCache.key === key) return monthBusyCache.promise;
-      const first = y + '-' + p2(m + 1) + '-01';
-      const last  = y + '-' + p2(m + 1) + '-' + p2(new Date(y, m + 1, 0).getDate());
-      const promise = fetchBusyRange(first, last);
-      monthBusyCache = { key, promise, busy: [] };
-      promise.then(busy => { if (monthBusyCache.key === key) monthBusyCache.busy = busy; });
-      return promise;
-    }
+  // Theme the widget to match the navy contact card.
+  var sep = CALENDLY_URL.indexOf('?') === -1 ? '?' : '&';
+  var themed = CALENDLY_URL + sep +
+    'hide_gdpr_banner=1&background_color=0d1b35&text_color=ffffff&primary_color=ffffff';
 
-    async function getBusy(dateStr) {
-      const [y, m] = dateStr.split('-').map(Number);
-      await loadMonthBusy(y, m - 1);
-      return monthBusyCache.busy.filter(b => {
-        const d = b.start;
-        return (d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate())) === dateStr;
-      });
-    }
+  var widget = document.createElement('div');
+  widget.className = 'calendly-inline-widget';
+  widget.setAttribute('data-url', themed);
+  widget.style.minWidth = '320px';
+  widget.style.height = '680px';
+  mount.appendChild(widget);
 
-    function overlapsBusy(slotStart, slotEnd, busy) {
-      return busy.some(b => slotStart < b.end && slotEnd > b.start);
-    }
-
-    function p2(n){ return String(n).padStart(2,'0'); }
-
-    function render() {
-      loadMonthBusy(vY, vM); // prefetch this month's busy times so day clicks feel instant
-      document.getElementById('cal-month-label').textContent = MONTHS[vM] + ' ' + vY;
-      const firstDow = new Date(vY, vM, 1).getDay();
-      const offset   = firstDow === 0 ? 6 : firstDow - 1;
-      const dim      = new Date(vY, vM + 1, 0).getDate();
-      document.getElementById('cal-prev').disabled =
-        new Date(vY, vM, 1) <= new Date(today.getFullYear(), today.getMonth(), 1);
-
-      let h = '';
-      for (let i = 0; i < offset; i++) h += '<span class="cal-day-empty"> </span>';
-      for (let d = 1; d <= dim; d++) {
-        const dt  = new Date(vY, vM, d);
-        const dow = dt.getDay();
-        const ok  = dt >= today && dow !== 0;
-        const ds  = vY + '-' + p2(vM+1) + '-' + p2(d);
-        const cls = ['cal-day', ok?'avail':'', dt.getTime()===today.getTime()?'is-today':'', selDate===ds?'selected':''].filter(Boolean).join(' ');
-        h += `<button type="button" class="${cls}" ${ok?`data-date="${ds}" data-dow="${dow}"`:'disabled'}>${d}</button>`;
-      }
-      document.getElementById('cal-days').innerHTML = h;
-      document.getElementById('cal-days').querySelectorAll('.avail').forEach(btn => {
-        btn.addEventListener('click', function(){
-          selDate = this.dataset.date; selDow = +this.dataset.dow; selTime = null;
-          document.getElementById('cal-next-step').classList.remove('vis');
-          document.getElementById('cal-grid').style.display = 'none';
-          document.getElementById('cal-times-wrap').style.display = 'block';
-          render(); renderSlots();
-        });
-      });
-    }
-
-    async function renderSlots() {
-      const slots = SLOTS[selDow] || [];
-      if (!slots.length) return;
-      const parts = selDate.split('-');
-      const thisDate = selDate;
-      document.getElementById('cal-times-label').textContent =
-        DOW_RO[selDow] + ', ' + parts[2] + ' ' + MONTHS[+parts[1]-1].toLowerCase();
-      document.getElementById('cal-times').innerHTML = '<div class="cal-times-loading">Se verifică disponibilitatea...</div>';
-
-      const busy = await getBusy(thisDate);
-      if (selDate !== thisDate) return; // user navigated away while we were fetching
-
-      const earliestAllowed = new Date(Date.now() + MIN_LEAD_HOURS * 3600000);
-      const freeSlots = slots.filter(t => {
-        const slotStart = moldovaWallToDate(thisDate, t);
-        const slotEnd   = new Date(slotStart.getTime() + selDur * 60000);
-        if (slotStart < earliestAllowed) return false;
-        return !overlapsBusy(slotStart, slotEnd, busy);
-      });
-
-      if (!freeSlots.length) {
-        document.getElementById('cal-times').innerHTML = '<div class="cal-times-empty">Nu mai sunt ore libere în această zi pentru durata selectată.</div>';
-        return;
-      }
-
-      document.getElementById('cal-times').innerHTML = freeSlots.map(t =>
-        `<button type="button" class="cal-slot${selTime===t?' selected':''}" data-time="${t}">${t}</button>`
-      ).join('');
-      document.getElementById('cal-times').querySelectorAll('.cal-slot').forEach(btn => {
-        btn.addEventListener('click', function(){
-          selTime = this.dataset.time; renderSlots();
-          const nb = document.getElementById('cal-next-step');
-          nb.classList.add('vis');
-          nb.scrollIntoView({ behavior:'smooth', block:'nearest' });
-        });
-      });
-    }
-
-    document.getElementById('cal-change-date').addEventListener('click', function(){
-      selDate = null; selDow = null; selTime = null;
-      document.getElementById('cal-next-step').classList.remove('vis');
-      document.getElementById('cal-times-wrap').style.display = 'none';
-      document.getElementById('cal-grid').style.display = 'block';
-      render();
-    });
-
-    document.querySelectorAll('.cal-dur-btn').forEach(btn => {
-      btn.addEventListener('click', function(){
-        selDur = +this.dataset.dur;
-        document.querySelectorAll('.cal-dur-btn').forEach(b => b.classList.remove('selected'));
-        this.classList.add('selected');
-        if (selDate) {
-          selTime = null;
-          document.getElementById('cal-next-step').classList.remove('vis');
-          renderSlots();
-        }
-      });
-    });
-
-    document.querySelectorAll('.cal-type-btn').forEach(btn => {
-      btn.addEventListener('click', function(){
-        selType = this.dataset.type;
-        document.querySelectorAll('.cal-type-btn').forEach(b => b.classList.remove('selected'));
-        this.classList.add('selected');
-      });
-    });
-
-    document.getElementById('cal-prev').addEventListener('click', function(){
-      if (vM===0){vM=11;vY--;} else vM--; render();
-    });
-    document.getElementById('cal-next-month').addEventListener('click', function(){
-      if (vM===11){vM=0;vY++;} else vM++; render();
-    });
-    document.getElementById('cal-next-step').addEventListener('click', function(){
-      if (!selDate || !selTime) return;
-      document.getElementById('bdate-h').value = selDate;
-      document.getElementById('btime-h').value = selTime;
-      const durLabel = selDur === 30 ? '30 min' : selDur === 60 ? '1 oră' : '2 ore';
-      document.getElementById('bdur-h').value = durLabel;
-      document.getElementById('bdurmin-h').value = selDur;
-      const typeLabel = selType === 'birou' ? 'consultație la birou' : 'consultație telefonică';
-      document.getElementById('btype-h').value = selType === 'birou' ? 'La birou' : 'Telefonic';
-      const parts = selDate.split('-');
-      document.getElementById('bappt-h').value =
-        DOW_RO[selDow] + ', ' + parts[2] + ' ' + MONTHS[+parts[1]-1] + ' ' + parts[0] +
-        ' la ' + selTime + ' (ora Chișinăului, GMT+2/GMT+3) — ' + typeLabel;
-      document.getElementById('cal-summary').innerHTML =
-        '<strong>📅 ' + DOW_RO[selDow] + ', ' + parts[2] + ' ' + MONTHS[+parts[1]-1] + ' ' + parts[0] +
-        '</strong> la <strong>' + selTime + '</strong> &nbsp;·&nbsp; ' + typeLabel + ' · ' + durLabel +
-        '<br><span style="opacity:.6;font-size:12px">ora Chișinăului, GMT+2/GMT+3</span>';
-      document.getElementById('cal-step1').style.display = 'none';
-      document.getElementById('cal-step2').style.display = 'block';
-      setTimeout(()=>document.getElementById('bname').focus(), 50);
-    });
-    document.getElementById('cal-back-btn').addEventListener('click', function(){
-      document.getElementById('cal-step2').style.display = 'none';
-      document.getElementById('cal-step1').style.display = 'block';
-    });
-
-    render();
-  })();
-
-  /* ── Booking form → Web3Forms ── */
-  document.getElementById('bform').addEventListener('submit', async e => {
-    e.preventDefault();
-    const form = e.target;
-    const btn  = document.getElementById('bsub');
-    const orig = btn.innerHTML;
-    const val  = id => (document.getElementById(id).value||'').trim();
-    const miss = !val('bname')?'bname':!val('bphone')?'bphone':null;
-    if (miss) { document.getElementById(miss).focus(); return; }
-    const setBtn = (h,bg)=>{ btn.innerHTML=h; btn.style.background=bg||''; };
-    const SPIN = `<svg class="spinning" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>`;
-    const OK   = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
-    const ERR  = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
-    btn.disabled = true; setBtn(SPIN+' Se trimite...');
-    try {
-      const formData = Object.fromEntries(new FormData(form));
-      const res  = await fetch('https://api.web3forms.com/submit', {
-        method:'POST', headers:{'Content-Type':'application/json',Accept:'application/json'},
-        body: JSON.stringify(formData)
-      });
-      const json = await res.json();
-      if (json.success) {
-        setBtn(OK+' Programare confirmată! Vă vom contacta.','#1d4ed8');
-        form.reset();
-        if (GCAL_ENDPOINT && GCAL_ENDPOINT.indexOf('PASTE_YOUR') === -1 && formData.preferred_date && formData.preferred_time) {
-          const durMin = Number(formData.preferred_duration_minutes) || 30;
-          const start  = moldovaWallToDate(formData.preferred_date, formData.preferred_time);
-          const end    = new Date(start.getTime() + durMin * 60000);
-          fetch(GCAL_ENDPOINT, {
-            method: 'POST',
-            body: JSON.stringify({
-              token: GCAL_SECRET,
-              name: formData.name, phone: formData.phone, email: formData.email,
-              domain: formData.service, notes: formData.message,
-              meetingType: formData.meeting_type,
-              start: start.toISOString(), end: end.toISOString()
-            })
-          }).catch(() => {});
-        }
-      }
-      else throw new Error();
-    } catch { setBtn(ERR+' Eroare — sunați-ne la +373 60 300 165','#b91c1c'); }
-    setTimeout(()=>{ setBtn(orig); btn.disabled=false; }, 4500);
-  });
+  if (!document.querySelector('link[href*="assets.calendly.com"]')) {
+    var css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'https://assets.calendly.com/assets/external/widget.css';
+    document.head.appendChild(css);
+  }
+  if (window.Calendly) {
+    window.Calendly.initInlineWidgets();
+  } else if (!document.querySelector('script[src*="assets.calendly.com/assets/external/widget.js"]')) {
+    var js = document.createElement('script');
+    js.src = 'https://assets.calendly.com/assets/external/widget.js';
+    js.async = true;
+    document.body.appendChild(js);
+  }
+})();
 </script>
 
 
