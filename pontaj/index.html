@@ -1229,25 +1229,58 @@ function _normName(s) {
 function clientMatches(entryClient, reportName) {
   if (!reportName) return true;
   if (!entryClient) return false;
-  const rn = _normName(reportName);
+  // Strip file-metadata suffix: "CIUMAC Nicolae - 287" or "CHIȘLEAN Iana - FINALIZAT"
+  // These appear after " - " and are not part of anyone's name.
+  const nameOnly = reportName.split(/\s+-\s+/)[0];
+  const rn = _normName(nameOnly);
   const ec = _normName(entryClient);
   if (!rn) return true;
-  // Fast path: substring match
-  if (ec === rn || ec.includes(rn) || rn.includes(ec)) return true;
-  // Token-level match
-  const rTokens = rn.split(' ').filter(t => t.length >= 2);
-  const eWords  = ec.split(' ').filter(t => t.length >= 1);
-  for (const rt of rTokens) {
-    const isInitial = rt.length === 2 && rt[1] === '.';
-    if (isInitial) {
-      // "m." in report matches any entry word starting with that letter
-      if (eWords.some(ew => ew[0] === rt[0] && ew.length > 1)) return true;
-    } else if (rt.length >= 3) {
-      // Full word in report: exact word match in entry
-      if (eWords.includes(rt)) return true;
-      // Or entry has an initial that matches this word's first letter
-      if (eWords.some(ew => ew === rt[0] + '.')) return true;
+  // Fast path: full equality, or entry contains the full client name phrase.
+  // rn.includes(ec) is only safe when ec is multi-word — a single short word
+  // (e.g. "in") would be a substring of many compound names by accident.
+  if (ec === rn || ec.includes(rn)) return true;
+  if (ec.includes(' ') && rn.includes(ec)) return true;
+  // Group the name into distinct person segments by:
+  //   1. splitting on commas ("GROSU Viorica, GROSU Aliona" → two clauses)
+  //   2. within each comma-clause, splitting on Romanian relationship-indicator
+  //      stopwords ("în interesele soțului GROSU Vasile" → own group)
+  // Each group requires ALL its tokens to appear in the entry (AND within group,
+  // OR across groups) — prevents a shared surname/first-name from matching
+  // a completely different client.
+  const STOP = new Set([
+    'in','interesele','lui','a','al','ai','ale',
+    'tatalui','mamei','fratelui','surorii','sorei','fiicei','fiului',
+    'sotiei','sotului','sotilor','parintilor','bunicilor',
+    'bunicului','bunicii','unchiului','matusii',
+    'nepotului','nepoatei','copilului','copiilor',
+    'reprezintand','reprezentand'
+  ]);
+  const groups = [];
+  for (const clause of nameOnly.split(',').map(s => s.trim()).filter(Boolean)) {
+    const cn = _normName(clause);
+    const cWords = cn.split(' ').filter(Boolean);
+    let cur = [];
+    for (const w of cWords) {
+      if (STOP.has(w)) {
+        if (cur.length) groups.push(cur);
+        cur = [];
+      } else {
+        cur.push(w);
+      }
     }
+    if (cur.length) groups.push(cur);
+  }
+  const eWords = ec.split(' ').filter(Boolean);
+  for (const group of groups) {
+    const sig = group.filter(t => t.length >= 2);
+    if (!sig.length) continue;
+    const allMatch = sig.every(t => {
+      const isInitial = t.length === 2 && t[1] === '.';
+      if (isInitial) return eWords.some(ew => ew[0] === t[0] && ew.length > 1);
+      if (t.length < 3) return true;
+      return eWords.includes(t) || eWords.some(ew => ew === t[0] + '.');
+    });
+    if (allMatch) return true;
   }
   return false;
 }
