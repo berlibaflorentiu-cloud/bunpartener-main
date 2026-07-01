@@ -2251,12 +2251,16 @@ function renderClienti(container) {
     if (sf === 'active'    &&  isClientFinalized(c)) return false;
     if (sf === 'finalized' && !isClientFinalized(c)) return false;
     return true;
+  }).slice().sort((a, b) => {
+    const ka = contractSortKey(a.notes), kb = contractSortKey(b.notes);
+    if (kb !== ka) return kb.localeCompare(ka); // most recent first
+    return a.name.localeCompare(b.name);         // tie-break alphabetically
   });
 
   container.innerHTML = `
     <div class="add-form" style="margin-bottom:28px">
       <div class="form-title">Client nou</div>
-      <div style="display:grid;grid-template-columns:1fr 1.6fr auto;gap:12px;align-items:end">
+      <div style="display:grid;grid-template-columns:1fr 1.6fr auto auto;gap:12px;align-items:end">
         <div class="field">
           <label>Nume / dosar</label>
           <input type="text" id="c-name" placeholder="ex. SC Alpha SRL" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')addClient()">
@@ -2266,11 +2270,12 @@ function renderClienti(container) {
           <input type="text" id="c-contract" placeholder="ex. VB-17.285/03-24" autocorrect="off" onkeydown="if(event.key==='Enter')addClient()">
         </div>
         <button class="btn-primary" id="btn-add-client" onclick="addClient()" style="padding:9px 22px">Adaugă</button>
+        <button onclick="openExportClientiModal()" style="display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:13px;cursor:pointer;transition:all .15s;white-space:nowrap" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exportă CSV</button>
       </div>
     </div>
 
     ${allClients.length === 0 ? '' : `
-    <div style="display:flex;gap:6px;margin-bottom:10px">
+    <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
       ${['all','active','finalized'].map(s => {
         const label = s === 'all' ? 'Toți' : s === 'active' ? 'Activi' : 'Finalizați';
         const active = (state.clientiStatus||'all') === s;
@@ -2298,19 +2303,21 @@ function renderClienti(container) {
               ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`
               : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>`;
             return `
-              <div class="lsc" data-client-id="${c.id}" style="position:relative;cursor:pointer;${done ? 'background:rgba(100,28,28,.13);border:1px solid rgba(150,55,55,.3);border-left:4px solid rgba(160,60,60,.6)' : ''}" onclick="showClientReceipts('${c.id}', event)">
-                <div class="lsc-actions" style="position:absolute;top:7px;right:8px;display:flex;gap:4px;align-items:center">
-                  <button onclick="toggleClientStatus('${c.id}',event)" title="${done ? 'Marchează activ' : 'Marchează finalizat'}"
-                    style="background:none;border:none;color:${done ? '#b07878' : 'var(--muted)'};cursor:pointer;padding:3px 5px;border-radius:4px;line-height:1;transition:color .15s,background .15s"
-                    onmouseover="this.style.background='rgba(128,128,128,.12)'" onmouseout="this.style.background='none'">${checkIcon}</button>
-                  <button class="btn-edit" onclick="editClient('${c.id}');event.stopPropagation()" title="Editează" style="padding:4px 6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-                  <button onclick="deleteClient('${c.id}');event.stopPropagation()" title="Șterge"
-                    style="background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;line-height:1;padding:2px 5px;border-radius:4px;transition:color .15s,background .15s"
-                    onmouseover="this.style.color='#e05c5c';this.style.background='rgba(224,92,92,.12)'"
-                    onmouseout="this.style.color='var(--muted)';this.style.background='none'">✕</button>
+              <div class="lsc" data-client-id="${c.id}" style="cursor:pointer;${done ? 'background:rgba(100,28,28,.13);border:1px solid rgba(150,55,55,.3);border-left:4px solid rgba(160,60,60,.6)' : ''}" onclick="showClientReceipts('${c.id}', event)">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;min-height:24px">
+                  ${done ? `<div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#9b5050;font-weight:600">Finalizat</div>` : '<div></div>'}
+                  <div class="lsc-actions" style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+                    <button onclick="toggleClientStatus('${c.id}',event)" title="${done ? 'Marchează activ' : 'Marchează finalizat'}"
+                      style="background:none;border:none;color:${done ? '#b07878' : 'var(--muted)'};cursor:pointer;padding:3px 5px;border-radius:4px;line-height:1;transition:color .15s,background .15s"
+                      onmouseover="this.style.background='rgba(128,128,128,.12)'" onmouseout="this.style.background='none'">${checkIcon}</button>
+                    <button class="btn-edit" onclick="editClient('${c.id}');event.stopPropagation()" title="Editează" style="padding:4px 6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                    <button onclick="deleteClient('${c.id}');event.stopPropagation()" title="Șterge"
+                      style="background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;line-height:1;padding:2px 5px;border-radius:4px;transition:color .15s,background .15s"
+                      onmouseover="this.style.color='#e05c5c';this.style.background='rgba(224,92,92,.12)'"
+                      onmouseout="this.style.color='var(--muted)';this.style.background='none'">✕</button>
+                  </div>
                 </div>
-                ${done ? `<div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#9b5050;font-weight:600;margin-bottom:5px">Finalizat</div>` : ''}
-                <div class="lsc-name" style="padding-right:84px;font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:${done ? '#b07878' : 'var(--gold)'};letter-spacing:-.01em">${esc(dispName)}</div>
+                <div class="lsc-name" style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:${done ? '#b07878' : 'var(--gold)'};letter-spacing:-.01em;line-height:1.3">${esc(dispName)}</div>
                 <div class="lsc-contract" style="font-size:12px;color:var(--muted);margin-top:2px;margin-bottom:10px;line-height:1.4">${c.notes ? esc(c.notes) : '—'}</div>
                 <div class="lsc-row"><span>Intrări</span><span>${cnt}</span></div>
                 <div class="lsc-row"><span>Facturi</span><span>${invCt}</span></div>
@@ -2346,9 +2353,164 @@ function isClientFinalized(c) {
   return /\s*-\s*FINALIZAT\s*$/i.test(c.name);
 }
 
+// Extract 4-digit year from a contract notes string (e.g. "VB-32.437/07-25 din 10 iulie 2025" → "2025")
+function contractYear(notes) {
+  if (!notes) return null;
+  const m = notes.match(/\b(20\d{2})\b/);
+  return m ? m[1] : null;
+}
+
+// Returns a YYYY-MM sort key from a contract notes string for chronological ordering.
+// Uses /MM-YY from the contract number (e.g. "/07-25" → "2025-07").
+// Falls back to year-only, then empty string (no date → sorts last).
+function contractSortKey(notes) {
+  if (!notes) return '';
+  const mMY = notes.match(/\/(\d{2})-(\d{2})\b/);
+  if (mMY) {
+    const mDay = notes.match(/\bdin\s+(\d{1,2})\b/i);
+    const day = mDay ? mDay[1].padStart(2, '0') : '00';
+    return '20' + mMY[2] + '-' + mMY[1] + '-' + day;
+  }
+  const y = contractYear(notes);
+  return y ? y + '-00-00' : '';
+}
+
 function filterClientiStatus(s) {
   state.clientiStatus = s;
   renderAdminTabContent();
+}
+
+function openExportClientiModal() {
+  // Collect distinct years from contract notes (e.g. "din 10 iulie 2025" or "/07-25")
+  const yearSet = new Set();
+  allClients.forEach(c => { const y = contractYear(c.notes); if (y) yearSet.add(y); });
+  const years = Array.from(yearSet).sort().reverse();
+
+  document.getElementById('modal-title').innerHTML = `<span style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--gold)">Exportă clienți CSV</span>`;
+  document.getElementById('modal-actions').innerHTML = `<button class="btn-ghost" onclick="closeModal()">✕</button>`;
+
+  const colRows = [
+    { id:'col-contract', label:'Nr. Contract', checked:true },
+    { id:'col-status',   label:'Status (Activ/Finalizat)', checked:true },
+    { id:'col-entries',  label:'Nr. Intrări (ore)', checked:true },
+    { id:'col-invoices', label:'Nr. Facturi', checked:false },
+    { id:'col-receipts', label:'Nr. Chitanțe', checked:false },
+    { id:'col-years',    label:'Ani cu activitate', checked:true },
+  ];
+
+  document.getElementById('modal-body').innerHTML = `
+    <div style="padding:4px 0 8px;display:flex;flex-direction:column;gap:22px">
+
+      <div>
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Status clienți</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${[['all','Toți'],['active','Activi'],['finalized','Finalizați']].map(([v,l]) =>
+            `<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;color:var(--text)">
+              <input type="radio" name="exp-status" value="${v}" ${v==='all'?'checked':''} style="accent-color:var(--gold)"> ${l}
+            </label>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">An semnare contract</div>
+        <select id="exp-year" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 12px;font-size:14px;width:180px;cursor:pointer">
+          <option value="all">Toți anii</option>
+          ${years.map(y => `<option value="${y}">${y}</option>`).join('')}
+        </select>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px">Filtrează după anul din nr. de contract.</div>
+      </div>
+
+      <div>
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Coloane în CSV</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;color:var(--text)">
+            <input type="checkbox" checked disabled style="accent-color:var(--gold)"> Nume client
+          </label>
+          ${colRows.map(r =>
+            `<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;color:var(--text)">
+              <input type="checkbox" id="${r.id}" ${r.checked?'checked':''} style="accent-color:var(--gold)"> ${r.label}
+            </label>`
+          ).join('')}
+        </div>
+      </div>
+
+      <button onclick="generateClientiCSV()" class="btn-primary" style="align-self:flex-start;display:flex;align-items:center;gap:7px;padding:10px 24px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descarcă CSV
+      </button>
+    </div>
+  `;
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function generateClientiCSV() {
+  const statusFilter = document.querySelector('input[name="exp-status"]:checked')?.value || 'all';
+  const yearFilter   = document.getElementById('exp-year')?.value || 'all';
+
+  const inclContract = document.getElementById('col-contract')?.checked;
+  const inclStatus   = document.getElementById('col-status')?.checked;
+  const inclEntries  = document.getElementById('col-entries')?.checked;
+  const inclInvoices = document.getElementById('col-invoices')?.checked;
+  const inclReceipts = document.getElementById('col-receipts')?.checked;
+  const inclYears    = document.getElementById('col-years')?.checked;
+
+  // Filter clients by status
+  let clients = allClients.filter(c => {
+    const fin = isClientFinalized(c);
+    if (statusFilter === 'active'    &&  fin) return false;
+    if (statusFilter === 'finalized' && !fin) return false;
+    return true;
+  });
+
+  // Filter by year from contract number
+  if (yearFilter !== 'all') {
+    clients = clients.filter(c => contractYear(c.notes) === yearFilter);
+  }
+
+  // Build header
+  const header = ['Nume client'];
+  if (inclContract) header.push('Nr. Contract');
+  if (inclStatus)   header.push('Status');
+  if (inclEntries)  header.push('Nr. Intrări');
+  if (inclInvoices) header.push('Nr. Facturi');
+  if (inclReceipts) header.push('Nr. Chitanțe');
+  if (inclYears)    header.push('Ani cu activitate');
+
+  // Build rows
+  const rows = clients.map(c => {
+    const dispName = c.name.replace(/\s*-\s*FINALIZAT\s*$/i, '').trim();
+    const fin      = isClientFinalized(c);
+    const clientEntries = allEntries.filter(e => clientMatches(e.client, c.name));
+    const row = [dispName];
+    if (inclContract) row.push(c.notes || '');
+    if (inclStatus)   row.push(fin ? 'Finalizat' : 'Activ');
+    if (inclEntries)  row.push(clientEntries.length);
+    if (inclInvoices) row.push(allInvoices.filter(i => i.client_name && i.client_name.toLowerCase().includes(c.name.replace(/\s*-\s*FINALIZAT\s*$/i,'').trim().toLowerCase().slice(0,5))).length);
+    if (inclReceipts) row.push(allReceipts.filter(r => receiptBelongsToClient(r, c)).length);
+    if (inclYears) {
+      const yrs = [...new Set(clientEntries.filter(e => e.date).map(e => e.date.slice(0,4)))].sort();
+      row.push(yrs.join(', '));
+    }
+    return row;
+  });
+
+  // Serialize to CSV (RFC 4180)
+  function csvCell(v) {
+    const s = String(v == null ? '' : v);
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? '"' + s.replace(/"/g, '""') + '"'
+      : s;
+  }
+  const csv = [header, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n');
+
+  const filename = `clienti${yearFilter !== 'all' ? '_' + yearFilter : ''}_${statusFilter !== 'all' ? statusFilter + '_' : ''}${new Date().toISOString().slice(0,10)}.csv`;
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+  closeModal();
 }
 
 async function toggleClientStatus(id, event) {
