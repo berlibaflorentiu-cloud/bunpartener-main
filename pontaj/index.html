@@ -2298,7 +2298,7 @@ function renderClienti(container) {
               ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`
               : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>`;
             return `
-              <div class="lsc" data-client-id="${c.id}" style="position:relative;cursor:pointer;opacity:${done ? '.6' : '1'}" onclick="showClientReceipts('${c.id}', event)">
+              <div class="lsc" data-client-id="${c.id}" style="position:relative;cursor:pointer;${done ? 'background:rgba(150,35,35,.1);border-color:rgba(180,55,55,.35)' : ''}" onclick="showClientReceipts('${c.id}', event)">
                 <div class="lsc-actions" style="position:absolute;top:7px;right:8px;display:flex;gap:4px;align-items:center">
                   <button onclick="toggleClientStatus('${c.id}',event)" title="${done ? 'Marchează activ' : 'Marchează finalizat'}"
                     style="background:none;border:none;color:${done ? 'var(--green,#5cb85c)' : 'var(--muted)'};cursor:pointer;padding:3px 5px;border-radius:4px;line-height:1;transition:color .15s,background .15s"
