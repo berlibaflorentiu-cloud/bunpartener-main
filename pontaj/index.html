@@ -318,6 +318,20 @@
     }
     .field input:focus, .field select:focus { border-color: var(--gold); }
     .field input::placeholder { color: var(--muted); }
+    .ps-price-override {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+    .ps-price-override:focus { border-color: var(--gold); }
     .search-bar { position: relative; margin-bottom: 18px; max-width: 360px; }
     .search-bar input {
       background: var(--bg);
@@ -1000,6 +1014,7 @@ let allInvoiceEntries = [];
 let _invEditId        = null;
 let allReceipts       = [];
 let allClientReports  = [];
+let _actFormState     = null;
 
 function initDateRange() {
   const now = new Date();
@@ -3382,8 +3397,9 @@ function renderTemplateBar() {
   `;
 }
 
-async function showReportForm() {
+async function showReportForm(prefill) {
   const settings = JSON.parse(localStorage.getItem('pontaj_settings') || '{}');
+  const p = prefill || {};
 
   // Load templates
   const { data } = await db.from('act_templates').select('*').eq('user_id', currentUser.id).order('name');
@@ -3401,56 +3417,56 @@ async function showReportForm() {
       <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em">Cabinet</div>
       <div class="field">
         <label>Denumirea cabinetului</label>
-        <input type="text" id="rf-firm" value="${settings.firm || ''}" placeholder='ex. BIROUL ASOCIAT DE AVOCAȚI „BERLIBA ȘI PARTENERII"'>
+        <input type="text" id="rf-firm" value="${esc(p.firm ?? settings.firm ?? '')}" placeholder='ex. BIROUL ASOCIAT DE AVOCAȚI „BERLIBA ȘI PARTENERII"'>
       </div>
       <div class="field">
         <label>Avocatul coordonator</label>
-        <input type="text" id="rf-coordinator" value="${settings.coordinator || ''}" placeholder="ex. Viorel V. BERLIBA">
+        <input type="text" id="rf-coordinator" value="${esc(p.coordinator ?? settings.coordinator ?? '')}" placeholder="ex. Viorel V. BERLIBA">
       </div>
       <div class="field">
         <label>IDNO</label>
-        <input type="text" id="rf-idno" value="${settings.idno || ''}" placeholder="ex. 1234567890123">
+        <input type="text" id="rf-idno" value="${esc(p.idno ?? settings.idno ?? '')}" placeholder="ex. 1234567890123">
       </div>
       <div class="field">
         <label>IBAN (MDL)</label>
-        <input type="text" id="rf-iban-mdl" value="${settings.ibanMdl || ''}" placeholder="ex. MD96AG000000022243206109">
+        <input type="text" id="rf-iban-mdl" value="${esc(p.ibanMdl ?? settings.ibanMdl ?? '')}" placeholder="ex. MD96AG000000022243206109">
       </div>
       <div class="field">
         <label>Banca</label>
-        <input type="text" id="rf-bank" value="${settings.bank || ''}" placeholder='ex. B.C. „Moldova-Agroindbank" S.A.'>
+        <input type="text" id="rf-bank" value="${esc(p.bank ?? settings.bank ?? '')}" placeholder='ex. B.C. „Moldova-Agroindbank" S.A.'>
       </div>
 
       <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px">Client</div>
       <div class="field">
         <label>Numele clientului</label>
-        <input type="text" id="rf-client" placeholder="ex. Veronica CURMEI" autocomplete="off" autocorrect="off" spellcheck="false" oninput="updateClientMatchHint();clientAcInput(this)" onkeydown="clientAcKeydown(event)" onblur="setTimeout(closeClientAc,200)">
+        <input type="text" id="rf-client" value="${esc(p.clientName ?? '')}" placeholder="ex. Veronica CURMEI" autocomplete="off" autocorrect="off" spellcheck="false" oninput="updateClientMatchHint();clientAcInput(this)" onkeydown="clientAcKeydown(event)" onblur="setTimeout(closeClientAc,200)">
         <span id="rf-client-hint" style="font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4"></span>
       </div>
       <div class="field">
         <label>Date client (a.n., buletin, IDNP, domiciliu)</label>
-        <input type="text" id="rf-client-details" placeholder="ex. a.n. 01.01.1980, BI B01234567, IDNP 0123456789012, mun. Chișinău">
+        <input type="text" id="rf-client-details" value="${esc(p.clientDet ?? '')}" placeholder="ex. a.n. 01.01.1980, BI B01234567, IDNP 0123456789012, mun. Chișinău">
       </div>
 
       <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px">Contract</div>
       <div style="display:flex;gap:12px">
         <div class="field" style="flex:1">
           <label>Nr. contract</label>
-          <input type="text" id="rf-contract-nr" value="${settings.lastContractNr || ''}" placeholder="ex. VB-19.503/04-26" oninput="contractAcInput(this)" onkeydown="clientAcKeydown(event)" onblur="setTimeout(closeClientAc,200)">
+          <input type="text" id="rf-contract-nr" value="${esc(p.contractNr ?? settings.lastContractNr ?? '')}" placeholder="ex. VB-19.503/04-26" oninput="contractAcInput(this)" onkeydown="clientAcKeydown(event)" onblur="setTimeout(closeClientAc,200)">
         </div>
         <div class="field" style="flex:1">
           <label>Data contractului</label>
-          <input type="date" id="rf-contract-date" value="${settings.lastContractDate || state.dateStart}">
+          <input type="date" id="rf-contract-date" value="${p.contractDate ?? settings.lastContractDate ?? state.dateStart}">
         </div>
       </div>
 
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap">
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer">
-          <input type="checkbox" id="rf-attach-client" style="accent-color:var(--gold)">
+          <input type="checkbox" id="rf-attach-client" ${p.attachToClient ? 'checked' : ''} style="accent-color:var(--gold)">
           Atașează la client — se salvează în compartimentul clientului
         </label>
         <div style="display:flex;gap:8px">
           <button class="btn-ghost" onclick="closeModal()">Anulează</button>
-          <button class="btn-primary" onclick="generateAct()">Generează Actul</button>
+          <button class="btn-primary" onclick="proceedToPricing()">Continuă</button>
         </div>
       </div>
     </div>
@@ -3508,17 +3524,119 @@ async function deleteActTemplate() {
   renderTemplateBar();
 }
 
+// Entries matching the act's client + period + lawyer filter — shared between
+// the pricing-adjustment step and final generation so both see the same set.
+function _actMatchingEntries(clientName) {
+  return filterEntries(allEntries, state.dateStart, state.dateEnd, null)
+    .filter(e =>
+      state.filterUser === 'group'  ? (state.customGroup.length ? state.customGroup.includes(e.user_id) : true) :
+      state.filterUser === 'all'    ? true :
+      e.user_id === state.filterUser
+    )
+    .filter(e => clientMatches(e.client, clientName))
+    .sort((a,b) => a.date.localeCompare(b.date));
+}
+
+function proceedToPricing() {
+  const clientName = document.getElementById('rf-client').value.trim();
+  if (!clientName) { alert('Completează numele clientului.'); return; }
+
+  _actFormState = {
+    firm:         document.getElementById('rf-firm').value.trim(),
+    coordinator:  document.getElementById('rf-coordinator').value.trim(),
+    idno:         document.getElementById('rf-idno').value.trim(),
+    ibanMdl:      document.getElementById('rf-iban-mdl').value.trim(),
+    bank:         document.getElementById('rf-bank').value.trim(),
+    clientName,
+    clientDet:    document.getElementById('rf-client-details').value.trim(),
+    contractNr:   document.getElementById('rf-contract-nr').value.trim(),
+    contractDate: document.getElementById('rf-contract-date').value,
+    attachToClient: document.getElementById('rf-attach-client')?.checked || false,
+    rateOverride: _actFormState?.clientName === clientName ? _actFormState.rateOverride : null,
+    priceOverrides: _actFormState?.clientName === clientName ? _actFormState.priceOverrides : {},
+  };
+
+  showActPricingStep();
+}
+
+function showActPricingStep() {
+  const s = _actFormState;
+  const userMap = Object.fromEntries(allUsers.map(u => [u.id, u]));
+  const entries = _actMatchingEntries(s.clientName);
+  const hourlyEntries = entries.filter(e => e.fixed_price == null);
+  const fixedEntries  = entries.filter(e => e.fixed_price != null);
+
+  document.getElementById('modal-title').textContent = 'Ajustează tarifele pentru acest act';
+  document.getElementById('modal-actions').innerHTML = `
+    <button class="btn-ghost" onclick="showReportForm(_actFormState)">← Înapoi</button>
+    <button class="btn-ghost" onclick="closeModal()">✕</button>
+  `;
+  document.getElementById('modal-body').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:20px;padding:4px 0">
+      <p style="font-size:13px;color:var(--muted);line-height:1.5">
+        Aceste ajustări se aplică doar actului curent pentru <strong style="color:var(--text)">${esc(s.clientName)}</strong> — nu modifică tariful avocatului sau prețurile salvate ale intrărilor.
+      </p>
+
+      ${hourlyEntries.length ? `
+      <div>
+        <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px">Tarif orar pentru acest contract</div>
+        <div class="field">
+          <label>Tarif (EUR/h) — lasă gol pentru tariful standard al fiecărui avocat</label>
+          <input type="number" id="ps-rate-override" min="0" step="10" placeholder="tarif standard" value="${s.rateOverride ?? ''}">
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-top:6px">${hourlyEntries.length} intrare${hourlyEntries.length===1?'':'ri'} cu ore vor folosi acest tarif dacă e completat.</p>
+      </div>` : ''}
+
+      ${fixedEntries.length ? `
+      <div>
+        <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px">Prețuri fixe pentru acest act</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          ${fixedEntries.map(e => `
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px">${esc(e.description)}</div>
+                <div style="font-size:11px;color:var(--muted)">${fmtDate(e.date)} · ${userMap[e.user_id]?.name || '—'} · standard ${fmtMoney(Number(e.fixed_price))}</div>
+              </div>
+              <input type="number" class="ps-price-override" data-entry-id="${e.id}" min="0" step="50" style="width:110px;flex-shrink:0" value="${s.priceOverrides[e.id] ?? e.fixed_price}">
+            </div>
+          `).join('')}
+        </div>
+      </div>` : ''}
+
+      ${!hourlyEntries.length && !fixedEntries.length
+        ? `<p style="color:var(--muted);font-size:13px">Nicio intrare găsită pentru acest client în perioada selectată.</p>` : ''}
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:16px;border-top:1px solid var(--border)">
+        <button class="btn-ghost" onclick="showReportForm(_actFormState)">Anulează</button>
+        <button class="btn-primary" onclick="finalizeAct()">Generează Actul</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+async function finalizeAct() {
+  const rateVal = document.getElementById('ps-rate-override')?.value;
+  _actFormState.rateOverride = (rateVal !== undefined && rateVal !== '') ? Number(rateVal) : null;
+  _actFormState.priceOverrides = {};
+  document.querySelectorAll('.ps-price-override').forEach(inp => {
+    if (inp.value !== '') _actFormState.priceOverrides[inp.dataset.entryId] = Number(inp.value);
+  });
+  await generateAct();
+}
+
 async function generateAct() {
-  const attachToClient = document.getElementById('rf-attach-client')?.checked || false;
-  const firm         = document.getElementById('rf-firm').value.trim();
-  const coordinator  = document.getElementById('rf-coordinator').value.trim();
-  const idno         = document.getElementById('rf-idno').value.trim();
-  const ibanMdl      = document.getElementById('rf-iban-mdl').value.trim();
-  const bank         = document.getElementById('rf-bank').value.trim();
-  const clientName   = document.getElementById('rf-client').value.trim();
-  const clientDet    = document.getElementById('rf-client-details').value.trim();
-  const contractNr   = document.getElementById('rf-contract-nr').value.trim();
-  const contractDate = document.getElementById('rf-contract-date').value;
+  const fs = _actFormState;
+  const attachToClient = fs.attachToClient;
+  const firm         = fs.firm;
+  const coordinator  = fs.coordinator;
+  const idno         = fs.idno;
+  const ibanMdl      = fs.ibanMdl;
+  const bank         = fs.bank;
+  const clientName   = fs.clientName;
+  const clientDet    = fs.clientDet;
+  const contractNr   = fs.contractNr;
+  const contractDate = fs.contractDate;
 
   const settings = { firm, coordinator, idno, ibanMdl, bank,
                      lastContractNr: contractNr, lastContractDate: contractDate,
@@ -3530,29 +3648,27 @@ async function generateAct() {
   const now = new Date();
   const userMap = Object.fromEntries(allUsers.map(u => [u.id, u]));
 
-  const entries = filterEntries(allEntries, state.dateStart, state.dateEnd, null)
-                    .filter(e =>
-                      state.filterUser === 'group'  ? (state.customGroup.length ? state.customGroup.includes(e.user_id) : true) :
-                      state.filterUser === 'all'    ? true :
-                      e.user_id === state.filterUser
-                    )
-                    .filter(e => clientMatches(e.client, clientName))
-                    .sort((a,b) => a.date.localeCompare(b.date));
-
+  const entries = _actMatchingEntries(clientName);
   const totalHours = sumH(entries);
 
+  // Rate/price overrides apply only to this generated act — they never touch
+  // the lawyer's stored rate or the entry's saved fixed_price.
+  function rateForEntry(e) {
+    return fs.rateOverride != null ? fs.rateOverride : (userMap[e.user_id]?.rate || 0);
+  }
   function entryOnorariu(e) {
     if (e.fixed_type === 'cheltuiala') return 0;
-    if (e.fixed_price != null) return e.fixed_price;
-    return Number(e.hours) * (userMap[e.user_id]?.rate || 0);
+    if (e.fixed_price != null) return fs.priceOverrides[e.id] ?? e.fixed_price;
+    return Number(e.hours) * rateForEntry(e);
   }
   function entryCheltuiala(e) {
-    return (e.fixed_type === 'cheltuiala' && e.fixed_price != null) ? e.fixed_price : 0;
+    if (e.fixed_type !== 'cheltuiala' || e.fixed_price == null) return 0;
+    return fs.priceOverrides[e.id] ?? e.fixed_price;
   }
 
   const totalOnorariu   = entries.reduce((s, e) => s + (e.fixed_price != null ? entryOnorariu(e) : 0), 0);
   const totalCheltuieli = entries.reduce((s, e) => s + entryCheltuiala(e), 0);
-  const totalEur        = entries.reduce((s, e) => e.fixed_price == null ? s + Number(e.hours) * (userMap[e.user_id]?.rate || 0) : s, 0);
+  const totalEur        = entries.reduce((s, e) => e.fixed_price == null ? s + Number(e.hours) * rateForEntry(e) : s, 0);
   const grandTotal      = totalOnorariu + totalCheltuieli;
 
   // birouExtra is charged per client: 100 MDL for every 4000 MDL spent by that client.
@@ -3590,7 +3706,7 @@ async function generateAct() {
 
   document.getElementById('modal-title').textContent = 'Act de predare-primire';
   document.getElementById('modal-actions').innerHTML = `
-    <button class="btn-ghost" onclick="showReportForm()">← Înapoi</button>
+    <button class="btn-ghost" onclick="showActPricingStep()">← Înapoi</button>
     <button class="btn-ghost" onclick="window.print()">Tipărește</button>
     <button class="btn-primary" onclick="downloadDocx()" style="font-size:13px">↓ DOCX</button>
     <button class="btn-primary" onclick="downloadReport()" style="font-size:13px">↓ PDF</button>
@@ -3647,8 +3763,8 @@ async function generateAct() {
             const hon  = entryOnorariu(e);
             const chel = entryCheltuiala(e);
             const hoursDisplay = e.fixed_price != null ? '—' : `${Number(e.hours).toFixed(1)} ore`;
-            const rateDisplay  = e.fixed_price != null ? '—' : `${u?.rate ?? '—'} EUR`;
-            const eurEarned    = e.fixed_price == null ? Number(e.hours) * (u?.rate || 0) : 0;
+            const rateDisplay  = e.fixed_price != null ? '—' : `${rateForEntry(e) ?? '—'} EUR`;
+            const eurEarned    = e.fixed_price == null ? Number(e.hours) * rateForEntry(e) : 0;
             const sumaDisplay  = e.fixed_price != null && hon > 0
               ? fmtMoney(hon)
               : e.fixed_price == null && eurEarned > 0
