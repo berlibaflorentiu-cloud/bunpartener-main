@@ -3567,8 +3567,22 @@ async function generateAct() {
 
   const contractDateFmt = contractDate ? fmtDate(contractDate) : '___________';
   const dayNow    = String(now.getDate()).padStart(2,'0');
+  const monthNowN = String(now.getMonth() + 1).padStart(2,'0');
   const monthNow  = MONTHS[now.getMonth()].toLowerCase();
   const yearNow   = now.getFullYear();
+
+  // Fetch today's BNM (National Bank of Moldova) EUR rate to show a complete MDL total
+  // alongside the mixed EUR+MDL total. Only relevant when part of the act is in EUR.
+  let bnmRate = null, bnmRateDate = null;
+  if (totalEur > 0) {
+    try {
+      const { data, error } = await db.functions.invoke(`bnm-rate?date=${dayNow}.${monthNowN}.${yearNow}`, { method: 'GET' });
+      if (!error && data && data.eur) { bnmRate = data.eur; bnmRateDate = data.date; }
+    } catch (e) { /* BNM indisponibil — se omite totalul complet în MDL */ }
+  }
+  const totalMdlComplete = bnmRate != null
+    ? Math.round(totalEur * bnmRate) + totalOnorariu + totalCheltuieli + birouExtra
+    : null;
   const firmDisplay   = firm || 'BIROUL ASOCIAT DE AVOCAȚI';
   const coordDisplay  = coordinator || '___________';
   const clientDisplay = clientName || '___________';
@@ -3677,6 +3691,12 @@ async function generateAct() {
           </tr>
         </tbody>
       </table>
+
+      ${totalMdlComplete != null ? `
+      <p style="margin:-6px 0 18px;text-align:right;font-size:10pt;">
+        Curs oficial BNM din ${bnmRateDate}: 1 EUR = ${bnmRate.toLocaleString('ro-RO', {minimumFractionDigits:4,maximumFractionDigits:4})} MDL<br>
+        <strong>TOTAL GENERAL ÎN MDL: ${fmtMoney(totalMdlComplete)}</strong>
+      </p>` : ''}
 
       <p style="margin-bottom:8px;"><strong>2. CLIENTUL confirmă:</strong></p>
       <p style="margin-bottom:4px;text-align:justify;">a) faptul lipsei pretenţiilor de ordin material şi/sau juridic faţă de EXECUTOR pentru perioada vizată (${periodDisplay}),</p>
