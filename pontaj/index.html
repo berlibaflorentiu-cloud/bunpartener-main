@@ -586,9 +586,9 @@
     .lsc.active { border-color: var(--gold); background: var(--gold-dim); }
     .lsc.dashed { border-style: dashed; }
     .lsc-name { font-weight: 600; font-size: 15px; margin-bottom: 12px; }
-    .lsc-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--muted); margin-top: 5px; }
+    .lsc-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13px; line-height: 1.4; color: var(--muted); margin-top: 5px; }
     .lsc-row span:first-child { flex-shrink: 0; }
-    .lsc-row span:last-child { color: var(--text); text-align: right; }
+    .lsc-row span:last-child { color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
     .group-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
     .group-chip { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; background: var(--surface2); color: var(--muted); cursor: pointer; transition: all 0.15s; border: 1px solid transparent; user-select: none; }
     .group-chip:hover { border-color: var(--gold); color: var(--gold); }
@@ -999,6 +999,7 @@ let allInvoices       = [];
 let allInvoiceEntries = [];
 let _invEditId        = null;
 let allReceipts       = [];
+let allClientReports  = [];
 
 function initDateRange() {
   const now = new Date();
@@ -1168,16 +1169,18 @@ async function fetchAndShow(userId) {
 
     if (currentUser.role === 'admin') {
       try {
-        const [cRes, iRes, ieRes, rRes] = await dbTimeout(Promise.all([
+        const [cRes, iRes, ieRes, rRes, crRes] = await dbTimeout(Promise.all([
           db.from('clients').select('*').order('name'),
           db.from('invoices').select('*').order('created_at', { ascending: false }),
           db.from('invoice_entries').select('*'),
           db.from('receipts').select('*').order('date', { ascending: false }),
+          db.from('client_reports').select('*').order('created_at', { ascending: false }),
         ]));
         allClients        = cRes.data  || [];
         allInvoices       = iRes.data  || [];
         allInvoiceEntries = ieRes.data || [];
         allReceipts       = rRes.data  || [];
+        allClientReports  = crRes.data || [];
       } catch(e) { /* tables not yet created — graceful degradation */ }
     }
 
@@ -1208,16 +1211,18 @@ async function refreshInBackground(userId) {
 
     if (currentUser?.role === 'admin') {
       try {
-        const [cRes, iRes, ieRes, rRes] = await Promise.all([
+        const [cRes, iRes, ieRes, rRes, crRes] = await Promise.all([
           db.from('clients').select('*').order('name'),
           db.from('invoices').select('*').order('created_at', { ascending: false }),
           db.from('invoice_entries').select('*'),
           db.from('receipts').select('*').order('date', { ascending: false }),
+          db.from('client_reports').select('*').order('created_at', { ascending: false }),
         ]);
         allClients        = cRes.data  || [];
         allInvoices       = iRes.data  || [];
         allInvoiceEntries = ieRes.data || [];
         allReceipts       = rRes.data  || [];
+        allClientReports  = crRes.data || [];
       } catch(e) { /* tables not yet created */ }
     }
 
@@ -1351,6 +1356,15 @@ function receiptBelongsToClient(r, c) {
     return cn === rn || cn.includes(rn) || rn.includes(cn);
   }
   return clientMatches(r.client_name, c.name);
+}
+
+function reportBelongsToClient(rep, c) {
+  if (c.notes && rep.contract_nr) {
+    const cn = c.notes.trim().toLowerCase();
+    const rn = rep.contract_nr.trim().toLowerCase();
+    return cn === rn || cn.includes(rn) || rn.includes(cn);
+  }
+  return clientMatches(rep.client_name, c.name);
 }
 
 function updateClientMatchHint() {
@@ -2369,6 +2383,7 @@ function renderClienti(container) {
             const cnt      = allEntries.filter(e => clientMatches(e.client, c.name)).length;
             const invCt    = allInvoices.filter(i => i.client_name && i.client_name.toLowerCase().includes(c.name.toLowerCase().slice(0,5))).length;
             const rcptCt   = allReceipts.filter(r => receiptBelongsToClient(r, c)).length;
+            const repCt    = allClientReports.filter(r => reportBelongsToClient(r, c)).length;
             const done     = isClientFinalized(c);
             const dispName = c.name.replace(/\s*-\s*FINALIZAT\s*$/i, '').trim();
             const checkIcon = done
@@ -2394,6 +2409,7 @@ function renderClienti(container) {
                 <div class="lsc-row"><span>Intrări</span><span>${cnt}</span></div>
                 <div class="lsc-row"><span>Facturi</span><span>${invCt}</span></div>
                 <div class="lsc-row"><span>Chitanțe</span><span>${rcptCt}</span></div>
+                <div class="lsc-row"><span>Acte</span><span>${repCt}</span></div>
               </div>
             `;
           }).join('')}
@@ -3427,9 +3443,15 @@ async function showReportForm() {
         </div>
       </div>
 
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;padding-top:16px;border-top:1px solid var(--border)">
-        <button class="btn-ghost" onclick="closeModal()">Anulează</button>
-        <button class="btn-primary" onclick="generateAct()">Generează Actul</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer">
+          <input type="checkbox" id="rf-attach-client" style="accent-color:var(--gold)">
+          Atașează la client — se salvează în compartimentul clientului
+        </label>
+        <div style="display:flex;gap:8px">
+          <button class="btn-ghost" onclick="closeModal()">Anulează</button>
+          <button class="btn-primary" onclick="generateAct()">Generează Actul</button>
+        </div>
       </div>
     </div>
   `;
@@ -3487,6 +3509,7 @@ async function deleteActTemplate() {
 }
 
 async function generateAct() {
+  const attachToClient = document.getElementById('rf-attach-client')?.checked || false;
   const firm         = document.getElementById('rf-firm').value.trim();
   const coordinator  = document.getElementById('rf-coordinator').value.trim();
   const idno         = document.getElementById('rf-idno').value.trim();
@@ -3559,7 +3582,7 @@ async function generateAct() {
     <button class="btn-primary" onclick="downloadReport()" style="font-size:13px">↓ PDF</button>
     <button class="btn-ghost" onclick="closeModal()">✕</button>
   `;
-  document.getElementById('modal-body').innerHTML = `
+  const actDocHtml = `
     <div id="act-document" style="
       font-family: 'Times New Roman', Times, serif;
       font-size: 11pt; color: #000; background: #fff;
@@ -3687,7 +3710,24 @@ async function generateAct() {
     </div>
   `;
 
+  document.getElementById('modal-body').innerHTML = actDocHtml;
   document.getElementById('modal-overlay').style.display = 'flex';
+
+  if (attachToClient) {
+    const { data, error } = await db.from('client_reports').insert([{
+      client_name: clientName,
+      contract_nr: contractNr || null,
+      period_start: state.dateStart,
+      period_end: state.dateEnd,
+      total_hours: totalHours,
+      total_eur: totalEur,
+      total_mdl: grandTotal + birouExtra,
+      document_html: actDocHtml,
+      created_by: currentUser.id,
+    }]).select().single();
+    if (error) { alert('Actul a fost generat, dar nu a putut fi salvat la client: ' + error.message); }
+    else { allClientReports.unshift(data); }
+  }
 }
 
 async function downloadDocx() {
@@ -3730,16 +3770,23 @@ function downloadReport() {
   }).from(el).save();
 }
 
+let _clientModalId = null;
+
 function showClientReceipts(clientId, event) {
   if (event) event.stopPropagation();
   const card = document.querySelector(`[data-client-id="${clientId}"]`);
   if (card && card.dataset.editing === '1') return;
   const c = allClients.find(x => x.id === clientId);
   if (!c) return;
+  _clientModalId = clientId;
 
   const receipts = allReceipts
     .filter(r => receiptBelongsToClient(r, c))
     .sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+
+  const reports = allClientReports
+    .filter(r => reportBelongsToClient(r, c))
+    .sort((a, b) => a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0);
 
   const totalBaza = receipts.reduce((s, r) => s + (Number(r.plata_baza) || 0), 0);
   const totalComp = receipts.reduce((s, r) => s + (Number(r.compensare) || 0), 0);
@@ -3751,47 +3798,125 @@ function showClientReceipts(clientId, event) {
   `;
   document.getElementById('modal-actions').innerHTML = `<button class="btn-ghost" onclick="closeModal()">✕</button>`;
 
-  document.getElementById('modal-body').innerHTML = receipts.length === 0
-    ? `<div class="empty-state" style="padding:40px 20px"><p>Nicio chitanță înregistrată pentru acest client.</p></div>`
-    : `<div style="padding:14px 20px 0">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-          <span class="reg-total-badge">Total plată de bază: ${fmtMoney(totalBaza)}</span>
-          ${totalComp > 0 ? `<span class="reg-total-badge">Total compensare: ${fmtMoney(totalComp)}</span>` : ''}
+  const receiptsBlock = `
+    <div style="padding:14px 20px 0">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:12px">Chitanțe</div>
+    </div>
+    ${receipts.length === 0
+      ? `<div class="empty-state" style="padding:16px 20px 32px"><p>Nicio chitanță înregistrată pentru acest client.</p></div>`
+      : `<div style="padding:0 20px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+            <span class="reg-total-badge">Total plată de bază: ${fmtMoney(totalBaza)}</span>
+            ${totalComp > 0 ? `<span class="reg-total-badge">Total compensare: ${fmtMoney(totalComp)}</span>` : ''}
+          </div>
         </div>
-      </div>
-      <div class="reg-wrap" style="max-height:55vh;overflow-y:auto">
-        <table class="reg-table">
-          <thead><tr>
-            <th class="reg-nr">Nr.</th>
-            <th>Seria și Nr.</th>
-            <th>Data</th>
-            <th>Nr. Contract</th>
-            <th>Plată de bază</th>
-            <th>Compensare</th>
-            <th>Total bon</th>
-            <th style="text-align:center">Semnat</th>
-            <th style="text-align:center">Contabilitate</th>
-          </tr></thead>
-          <tbody>
-            ${receipts.map((r, i) => {
-              const total = (Number(r.plata_baza)||0) + (Number(r.compensare)||0);
-              return `<tr>
-                <td class="reg-nr">${i+1}</td>
-                <td style="font-weight:600;font-size:13px">${esc(r.serie_nr)}</td>
-                <td class="td-date">${fmtDate(r.date)}</td>
-                <td style="color:var(--muted);font-size:12px">${esc(r.contract_nr)||'—'}</td>
-                <td class="reg-money">${r.plata_baza > 0 ? fmtMoney(Number(r.plata_baza)) : '—'}</td>
-                <td class="reg-money">${r.compensare > 0 ? fmtMoney(Number(r.compensare)) : '—'}</td>
-                <td class="reg-total">${total > 0 ? fmtMoney(total) : '—'}</td>
-                <td style="text-align:center"><span class="${r.semnat ? 'badge-da' : 'badge-nu'}">${r.semnat ? 'DA' : 'NU'}</span></td>
-                <td style="text-align:center"><span class="${r.contabilitate ? 'badge-da' : 'badge-nu'}">${r.contabilitate ? 'DA' : 'NU'}</span></td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>`;
+        <div class="reg-wrap" style="max-height:40vh;overflow-y:auto">
+          <table class="reg-table">
+            <thead><tr>
+              <th class="reg-nr">Nr.</th>
+              <th>Seria și Nr.</th>
+              <th>Data</th>
+              <th>Nr. Contract</th>
+              <th>Plată de bază</th>
+              <th>Compensare</th>
+              <th>Total bon</th>
+              <th style="text-align:center">Semnat</th>
+              <th style="text-align:center">Contabilitate</th>
+            </tr></thead>
+            <tbody>
+              ${receipts.map((r, i) => {
+                const total = (Number(r.plata_baza)||0) + (Number(r.compensare)||0);
+                return `<tr>
+                  <td class="reg-nr">${i+1}</td>
+                  <td style="font-weight:600;font-size:13px">${esc(r.serie_nr)}</td>
+                  <td class="td-date">${fmtDate(r.date)}</td>
+                  <td style="color:var(--muted);font-size:12px">${esc(r.contract_nr)||'—'}</td>
+                  <td class="reg-money">${r.plata_baza > 0 ? fmtMoney(Number(r.plata_baza)) : '—'}</td>
+                  <td class="reg-money">${r.compensare > 0 ? fmtMoney(Number(r.compensare)) : '—'}</td>
+                  <td class="reg-total">${total > 0 ? fmtMoney(total) : '—'}</td>
+                  <td style="text-align:center"><span class="${r.semnat ? 'badge-da' : 'badge-nu'}">${r.semnat ? 'DA' : 'NU'}</span></td>
+                  <td style="text-align:center"><span class="${r.contabilitate ? 'badge-da' : 'badge-nu'}">${r.contabilitate ? 'DA' : 'NU'}</span></td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`
+    }`;
+
+  const reportsBlock = `
+    <div style="padding:18px 20px 0;margin-top:6px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin:14px 0 12px">Acte generate</div>
+    </div>
+    ${reports.length === 0
+      ? `<div class="empty-state" style="padding:0 20px 32px"><p>Niciun act salvat pentru acest client.</p></div>`
+      : `<div class="reg-wrap" style="max-height:40vh;overflow-y:auto;padding:0 20px 20px">
+          <table class="reg-table">
+            <thead><tr>
+              <th class="reg-nr">Nr.</th>
+              <th>Generat la</th>
+              <th>Nr. Contract</th>
+              <th>Perioadă</th>
+              <th>Ore</th>
+              <th>Total</th>
+              <th></th>
+            </tr></thead>
+            <tbody>
+              ${reports.map((r, i) => {
+                const totalDisplay = [
+                  Number(r.total_mdl) > 0 ? fmtMoney(Number(r.total_mdl)) : null,
+                  Number(r.total_eur) > 0 ? Number(r.total_eur).toLocaleString('ro-RO', {maximumFractionDigits:2}) + ' EUR' : null,
+                ].filter(Boolean).join(' + ') || '—';
+                return `<tr>
+                  <td class="reg-nr">${i+1}</td>
+                  <td class="td-date">${r.created_at ? fmtDate(r.created_at.split('T')[0]) : '—'}</td>
+                  <td style="color:var(--muted);font-size:12px">${esc(r.contract_nr)||'—'}</td>
+                  <td style="color:var(--muted);font-size:12px">${fmtDate(r.period_start)} – ${fmtDate(r.period_end)}</td>
+                  <td class="reg-money">${r.total_hours > 0 ? Number(r.total_hours).toFixed(1) + 'h' : '—'}</td>
+                  <td class="reg-total">${totalDisplay}</td>
+                  <td class="td-del">
+                    <button class="btn-edit" onclick="viewSavedReport('${r.id}')" aria-label="Deschide actul" title="Deschide"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                    <button class="btn-delete" onclick="deleteClientReport('${r.id}')" aria-label="Șterge actul" title="Șterge">✕</button>
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`
+    }`;
+
+  document.getElementById('modal-body').innerHTML = receiptsBlock + reportsBlock;
 
   document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function viewSavedReport(id) {
+  const r = allClientReports.find(x => x.id === id);
+  if (!r) return;
+  const settings = JSON.parse(localStorage.getItem('pontaj_settings') || '{}');
+  settings.lastClient = r.client_name;
+  localStorage.setItem('pontaj_settings', JSON.stringify(settings));
+
+  document.getElementById('modal-title').innerHTML = `
+    <div>${esc(r.client_name)}</div>
+    <div style="font-size:13px;font-weight:400;color:var(--muted);margin-top:3px;font-family:inherit">Act generat la ${r.created_at ? fmtDate(r.created_at.split('T')[0]) : '—'}</div>
+  `;
+  document.getElementById('modal-actions').innerHTML = `
+    <button class="btn-ghost" onclick="showClientReceipts('${_clientModalId}')">← Înapoi</button>
+    <button class="btn-ghost" onclick="window.print()">Tipărește</button>
+    <button class="btn-primary" onclick="downloadDocx()" style="font-size:13px">↓ DOCX</button>
+    <button class="btn-primary" onclick="downloadReport()" style="font-size:13px">↓ PDF</button>
+    <button class="btn-ghost" onclick="closeModal()">✕</button>
+  `;
+  document.getElementById('modal-body').innerHTML = r.document_html;
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+async function deleteClientReport(id) {
+  if (!confirm('Ștergi acest act salvat? Acțiunea nu poate fi anulată.')) return;
+  const { error } = await db.from('client_reports').delete().eq('id', id);
+  if (error) { alert(error.message); return; }
+  allClientReports = allClientReports.filter(x => x.id !== id);
+  if (_clientModalId) showClientReceipts(_clientModalId);
 }
 
 function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; _invEditId = null; }
