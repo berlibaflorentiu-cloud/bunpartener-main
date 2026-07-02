@@ -662,8 +662,10 @@
     }
     .modal-head {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
+      row-gap: 12px;
       padding: 20px 28px;
       border-bottom: 1px solid var(--border);
       position: sticky;
@@ -671,8 +673,8 @@
       background: var(--surface);
       z-index: 1;
     }
-    .modal-head-title { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: var(--gold); white-space: normal; overflow-wrap: break-word; min-width: 0; }
-    .modal-actions { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; }
+    .modal-head-title { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: var(--gold); white-space: normal; overflow-wrap: break-word; min-width: 0; flex: 1 1 auto; }
+    .modal-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
     .report-body { padding: 32px 36px; position: relative; }
 
     /* ── PRINT ── */
@@ -2717,6 +2719,7 @@ function pickClientAc(i) {
   _cac.inputEl.value = c.name;
   _cac.inputEl.dispatchEvent(new Event('input', { bubbles: true }));
   autofillContractNr(_cac.inputEl, c);
+  autofillContractDate(_cac.inputEl, c);
   closeClientAc();
 }
 
@@ -2728,6 +2731,30 @@ function autofillContractNr(inputEl, client) {
   if (!targetId || !client.notes) return;
   const target = document.getElementById(targetId);
   if (target) target.value = client.notes;
+}
+
+// Auto-fills the contract-date field (only present on the act report form)
+// from the "din DD lună YYYY" written date in the client's contract notes.
+const CONTRACT_DATE_TARGETS = { 'rf-client': 'rf-contract-date', 'rf-contract-nr': 'rf-contract-date' };
+const MONTH_NAME_TO_NUM = {
+  ianuarie:'01', februarie:'02', martie:'03', aprilie:'04', mai:'05', iunie:'06',
+  iulie:'07', august:'08', septembrie:'09', octombrie:'10', noiembrie:'11', decembrie:'12',
+};
+function contractDateFromNotes(notes) {
+  if (!notes) return null;
+  const m = notes.match(/\bdin\s+(\d{1,2})\s+([a-zăâîșțA-ZĂÂÎȘȚ]+)\s+(\d{4})/i);
+  if (!m) return null;
+  const mon = MONTH_NAME_TO_NUM[m[2].toLowerCase()];
+  if (!mon) return null;
+  return `${m[3]}-${mon}-${m[1].padStart(2,'0')}`;
+}
+function autofillContractDate(inputEl, client) {
+  const targetId = CONTRACT_DATE_TARGETS[inputEl.id];
+  if (!targetId) return;
+  const dateStr = contractDateFromNotes(client.notes);
+  if (!dateStr) return;
+  const target = document.getElementById(targetId);
+  if (target) target.value = dateStr;
 }
 
 // Reverse: dropdown autocomplete for contract-number fields.
@@ -2769,6 +2796,7 @@ function pickContractAc(i) {
   const nameId = CLIENT_FROM_CONTRACT[_cac.inputEl.id];
   const nameEl = nameId && document.getElementById(nameId);
   if (nameEl) nameEl.value = c.name;
+  autofillContractDate(_cac.inputEl, c);
   closeClientAc();
 }
 
@@ -3459,15 +3487,9 @@ async function showReportForm(prefill) {
         </div>
       </div>
 
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap">
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer">
-          <input type="checkbox" id="rf-attach-client" ${p.attachToClient ? 'checked' : ''} style="accent-color:var(--gold)">
-          Atașează la client — se salvează în compartimentul clientului
-        </label>
-        <div style="display:flex;gap:8px">
-          <button class="btn-ghost" onclick="closeModal()">Anulează</button>
-          <button class="btn-primary" onclick="proceedToPricing()">Continuă</button>
-        </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;padding-top:16px;border-top:1px solid var(--border)">
+        <button class="btn-ghost" onclick="closeModal()">Anulează</button>
+        <button class="btn-primary" onclick="proceedToPricing()">Continuă</button>
       </div>
     </div>
   `;
@@ -3551,7 +3573,6 @@ function proceedToPricing() {
     clientDet:    document.getElementById('rf-client-details').value.trim(),
     contractNr:   document.getElementById('rf-contract-nr').value.trim(),
     contractDate: document.getElementById('rf-contract-date').value,
-    attachToClient: document.getElementById('rf-attach-client')?.checked || false,
     rateOverride: _actFormState?.clientName === clientName ? _actFormState.rateOverride : null,
     priceOverrides: _actFormState?.clientName === clientName ? _actFormState.priceOverrides : {},
   };
@@ -3625,9 +3646,12 @@ async function finalizeAct() {
   await generateAct();
 }
 
+const SAVE_BTN_LABEL = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvează la client`;
+
 async function generateAct() {
   const fs = _actFormState;
-  const attachToClient = fs.attachToClient;
+  fs.saveState = 'idle';
+  fs.savedReportId = null;
   const firm         = fs.firm;
   const coordinator  = fs.coordinator;
   const idno         = fs.idno;
@@ -3710,6 +3734,7 @@ async function generateAct() {
     <button class="btn-ghost" onclick="window.print()">Tipărește</button>
     <button class="btn-primary" onclick="downloadDocx()" style="font-size:13px">↓ DOCX</button>
     <button class="btn-primary" onclick="downloadReport()" style="font-size:13px">↓ PDF</button>
+    <button class="btn-primary" id="save-to-client-btn" onclick="saveActToClient()" style="font-size:13px;display:inline-flex;align-items:center;gap:6px">${SAVE_BTN_LABEL}</button>
     <button class="btn-ghost" onclick="closeModal()">✕</button>
   `;
   const actDocHtml = `
@@ -3849,20 +3874,52 @@ async function generateAct() {
   document.getElementById('modal-body').innerHTML = actDocHtml;
   document.getElementById('modal-overlay').style.display = 'flex';
 
-  if (attachToClient) {
-    const { data, error } = await db.from('client_reports').insert([{
-      client_name: clientName,
-      contract_nr: contractNr || null,
-      period_start: state.dateStart,
-      period_end: state.dateEnd,
-      total_hours: totalHours,
-      total_eur: totalEur,
-      total_mdl: grandTotal + birouExtra,
-      document_html: actDocHtml,
-      created_by: currentUser.id,
-    }]).select().single();
-    if (error) { alert('Actul a fost generat, dar nu a putut fi salvat la client: ' + error.message); }
-    else { allClientReports.unshift(data); }
+  // Snapshot everything saveActToClient() needs — it's a plain global function
+  // (called from an inline onclick), so it reads from _actFormState rather
+  // than closing over these locals.
+  fs.saveData = {
+    clientName, contractNr,
+    periodStart: state.dateStart, periodEnd: state.dateEnd,
+    totalHours, totalEur, totalMdl: grandTotal + birouExtra,
+    documentHtml: actDocHtml,
+  };
+}
+
+async function saveActToClient() {
+  const fs = _actFormState;
+  if (!fs || !fs.saveData || fs.saveState === 'saved' || fs.saveState === 'saving') return;
+  fs.saveState = 'saving';
+  const btn = document.getElementById('save-to-client-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Se salvează...'; }
+
+  const d = fs.saveData;
+  const { data, error } = await db.from('client_reports').insert([{
+    client_name: d.clientName,
+    contract_nr: d.contractNr || null,
+    period_start: d.periodStart,
+    period_end: d.periodEnd,
+    total_hours: d.totalHours,
+    total_eur: d.totalEur,
+    total_mdl: d.totalMdl,
+    document_html: d.documentHtml,
+    created_by: currentUser.id,
+  }]).select().single();
+
+  if (error) {
+    fs.saveState = 'idle';
+    if (btn) { btn.disabled = false; btn.innerHTML = SAVE_BTN_LABEL; }
+    alert('Nu s-a putut salva actul la client: ' + error.message);
+    return;
+  }
+
+  fs.saveState = 'saved';
+  fs.savedReportId = data.id;
+  allClientReports.unshift(data);
+  if (btn) {
+    btn.disabled = true;
+    btn.style.opacity = '.6';
+    btn.style.cursor = 'default';
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Salvat la client`;
   }
 }
 
