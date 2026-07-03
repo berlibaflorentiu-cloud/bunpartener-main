@@ -302,6 +302,13 @@
       gap: 12px;
       align-items: end;
     }
+    .client-add-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.6fr auto auto;
+      gap: 12px;
+      align-items: end;
+    }
+    .cheltuiala-add-grid { grid-template-columns: 150px 1.5fr 1fr auto; }
     .field { display: flex; flex-direction: column; gap: 6px; }
     .field label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); }
     .field input, .field select {
@@ -686,12 +693,29 @@
       .modal-head { border-bottom: 2px solid #111; }
       .modal-head-title { color: #111; }
       .report-body { padding: 24px 0; }
+      .act-edit-hint { display: none !important; }
+      #act-document { outline: none !important; }
       :root {
         --text: #111; --muted: #555; --gold: #7a5c1e;
         --border: #ddd; --surface2: #f5f5f5; --gold-dim: #f9f4ea;
         --bg: white; --surface: white;
       }
     }
+
+    /* ── ACT DOCUMENT — editable before print/download/save ── */
+    #act-document[contenteditable="true"] {
+      cursor: text;
+      transition: outline-color .15s;
+      outline: 1px dashed transparent;
+      outline-offset: 6px;
+    }
+    #act-document[contenteditable="true"]:hover,
+    #act-document[contenteditable="true"]:focus {
+      outline-color: rgba(200,169,110,.6);
+    }
+    /* The app's dashboard tables highlight hovered rows with a dark fill —
+       wrong for this document, which is styled light/print-like. */
+    #act-document tr:hover td { background: none; }
 
     /* ── ADMIN TABS ── */
     .admin-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:24px; overflow-x:auto; scrollbar-width:none; }
@@ -784,6 +808,16 @@
       .form-grid > *:nth-child(4),
       .form-grid > *:nth-child(5) { grid-column: span 2; }
       .form-grid .btn-primary { width: 100%; min-height: 46px; }
+
+      .client-add-grid { grid-template-columns: 1fr; }
+      .client-add-grid .btn-primary,
+      .client-add-grid > button { width: 100%; min-height: 46px; }
+
+      .cheltuiala-add-grid { grid-template-columns: 1fr; }
+      .cheltuiala-add-grid > *:nth-child(3),
+      .cheltuiala-add-grid > *:nth-child(4),
+      .cheltuiala-add-grid > *:nth-child(5) { grid-column: auto; }
+      .cheltuiala-add-grid .btn-primary { width: 100%; min-height: 46px; }
 
       /* ── STATS: compact, balanced cards (label+sub left, value right) ── */
       .stats-row { gap: 10px; }
@@ -1832,7 +1866,7 @@ function renderAvocatCheltuieli(container, user) {
 
     <div class="add-form">
       <div class="form-title">Adaugă cheltuială (MDL)</div>
-      <div class="form-grid" style="grid-template-columns:150px 1.5fr 1fr auto">
+      <div class="form-grid cheltuiala-add-grid">
         <div class="field">
           <label>Data</label>
           <input type="date" id="c-date" value="${todayStr()}" max="${todayStr()}">
@@ -2488,7 +2522,7 @@ function renderClienti(container) {
   container.innerHTML = `
     <div class="add-form" style="margin-bottom:28px">
       <div class="form-title">Client nou</div>
-      <div style="display:grid;grid-template-columns:1fr 1.6fr auto auto;gap:12px;align-items:end">
+      <div class="client-add-grid">
         <div class="field">
           <label>Nume / dosar</label>
           <input type="text" id="c-name" placeholder="ex. SC Alpha SRL" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')addClient()">
@@ -3893,10 +3927,12 @@ async function generateAct() {
     <button class="btn-ghost" onclick="closeModal()">✕</button>
   `;
   const actDocHtml = `
-    <div id="act-document" style="
+    <p class="act-edit-hint" style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--muted);margin-bottom:10px">Poți edita orice text direct în document înainte de a-l tipări, descărca sau salva.</p>
+    <div id="act-document" contenteditable="true" spellcheck="false" style="
       font-family: 'Times New Roman', Times, serif;
       font-size: 11pt; color: #000; background: #fff;
       padding: 20px 28px; line-height: 1.5;
+      outline: none;
     ">
       <div style="display:flex;align-items:center;gap:20px;margin-bottom:18px;">
         ${logoSrc ? `<img src="${logoSrc}" style="height:72px;width:auto;object-fit:contain;flex-shrink:0">` : ''}
@@ -4055,6 +4091,9 @@ async function saveActToClient() {
   if (btn) { btn.disabled = true; btn.textContent = 'Se salvează...'; }
 
   const d = fs.saveData;
+  // Read the live document rather than the pre-generation snapshot, so any
+  // manual edits made in the editable act view are captured too.
+  const liveHtml = document.getElementById('act-document')?.outerHTML || d.documentHtml;
   const { data, error } = await db.from('client_reports').insert([{
     client_name: d.clientName,
     contract_nr: d.contractNr || null,
@@ -4064,7 +4103,7 @@ async function saveActToClient() {
     total_eur: d.totalEur,
     total_mdl: d.totalMdl,
     total_mdl_complete: d.totalMdlComplete ?? null,
-    document_html: d.documentHtml,
+    document_html: liveHtml,
     created_by: currentUser.id,
   }]).select().single();
 
@@ -4094,6 +4133,8 @@ async function downloadDocx() {
   const date = new Date().toISOString().split('T')[0];
 
   const clone = el.cloneNode(true);
+  clone.removeAttribute('contenteditable');
+  clone.removeAttribute('spellcheck');
   // Word doesn't render data: URIs — swap to hosted URL so it loads correctly
   const cloneLogo = clone.querySelector('img');
   if (cloneLogo) cloneLogo.src = 'https://bunpartener.md/pontaj/BU_logo_highres_white_background.png';
@@ -4266,7 +4307,12 @@ function viewSavedReport(id) {
     <button class="btn-primary" onclick="downloadReport()" style="font-size:13px">↓ PDF</button>
     <button class="btn-ghost" onclick="closeModal()">✕</button>
   `;
-  document.getElementById('modal-body').innerHTML = r.document_html;
+  document.getElementById('modal-body').innerHTML = `
+    <p class="act-edit-hint" style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--muted);margin-bottom:10px">Poți edita orice text direct în document înainte de a-l tipări sau descărca. Editările de aici nu se salvează automat înapoi la client.</p>
+    ${r.document_html}
+  `;
+  const reopenedDoc = document.getElementById('act-document');
+  if (reopenedDoc) { reopenedDoc.contentEditable = 'true'; reopenedDoc.spellcheck = false; }
   document.getElementById('modal-overlay').style.display = 'flex';
 }
 
