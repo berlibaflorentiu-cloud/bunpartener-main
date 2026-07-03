@@ -1063,6 +1063,7 @@ function initDateRange() {
 const _dr = initDateRange();
 const state = { dateStart: _dr.start, dateEnd: _dr.end, filterUser: 'all', viewMode: 'admin', customGroup: [], adminTab: 'pontaj', clientiSearch: '', clientiStatus: 'all', registruSearch: '', pontajPage: 1, registruPage: 1, avocatTab: 'pontaj' };
 const PAGE_SIZE = 30;
+function isAdmin(u) { return u?.role === 'admin' || u?.role === 'owner'; }
 
 // Slices `arr` for page `page` (1-indexed) without mutating it — used for
 // table pagination so the underlying data arrays are never touched.
@@ -1218,7 +1219,7 @@ async function fetchAndShow(userId) {
     localStorage.setItem('pontaj_users_cache',   JSON.stringify(allUsers));
     localStorage.setItem('pontaj_entries_cache', JSON.stringify(allEntries));
 
-    if (currentUser.role === 'admin') {
+    if (isAdmin(currentUser)) {
       try {
         const [cRes, iRes, ieRes, rRes, crRes] = await dbTimeout(Promise.all([
           db.from('clients').select('*').order('name'),
@@ -1260,7 +1261,7 @@ async function refreshInBackground(userId) {
     localStorage.setItem('pontaj_users_cache',   JSON.stringify(allUsers));
     localStorage.setItem('pontaj_entries_cache', JSON.stringify(allEntries));
 
-    if (currentUser?.role === 'admin') {
+    if (isAdmin(currentUser)) {
       try {
         const [cRes, iRes, ieRes, rRes, crRes] = await Promise.all([
           db.from('clients').select('*').order('name'),
@@ -1524,7 +1525,7 @@ async function deleteUser(id, name) {
 
 function updateRequestsBadge() {
   const el = document.getElementById('header-requests');
-  if (!el || currentUser?.role !== 'admin') { if(el) el.innerHTML=''; return; }
+  if (!el || !isAdmin(currentUser)) { if(el) el.innerHTML=''; return; }
   const pending = allUsers.filter(u => u.status === 'pending');
   el.innerHTML = `<button class="btn-ghost" onclick="showRequests()" style="position:relative">
     Cereri${pending.length ? `<span style="position:absolute;top:-4px;right:-4px;background:var(--gold);color:var(--bg);border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1">${pending.length}</span>` : ''}
@@ -1581,7 +1582,7 @@ function toggleViewMode() {
 
 function updateModeToggle() {
   const el = document.getElementById('header-mode-toggle');
-  if (!el || currentUser?.role !== 'admin') return;
+  if (!el || !isAdmin(currentUser)) return;
   const isAdmin = state.viewMode === 'admin';
   const icon = isAdmin
     ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
@@ -1592,7 +1593,7 @@ function updateModeToggle() {
 function render() {
   const user = getCurrentUser();
   if (!user) return;
-  if (user.role === 'admin' && state.viewMode === 'admin') {
+  if (isAdmin(user) && state.viewMode === 'admin') {
     renderAdmin();
   } else {
     renderAvocat(user);
@@ -2256,7 +2257,7 @@ function clearRegistruSearch() { state.registruSearch = ''; state.registruPage =
 
 // ── Tab: Pontaj (existing entries view) ──────────────────
 function renderAdminPontaj(container) {
-  const lawyers  = allUsers.filter(u => u.status === 'approved' || !u.status);
+  const lawyers  = allUsers.filter(u => u.role !== 'owner' && (u.status === 'approved' || !u.status));
   const userMap  = Object.fromEntries(allUsers.map(u => [u.id, u]));
   const billedIds = new Set(allInvoiceEntries.map(ie => ie.entry_id));
 
