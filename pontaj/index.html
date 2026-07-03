@@ -3700,6 +3700,7 @@ function proceedToPricing() {
     contractDate: document.getElementById('rf-contract-date').value,
     rateOverride: _actFormState?.clientName === clientName ? _actFormState.rateOverride : null,
     priceOverrides: _actFormState?.clientName === clientName ? _actFormState.priceOverrides : {},
+    extraCheltuieli: _actFormState?.clientName === clientName ? _actFormState.extraCheltuieli : 0,
   };
 
   showActPricingStep();
@@ -3709,8 +3710,18 @@ function showActPricingStep() {
   const s = _actFormState;
   const userMap = Object.fromEntries(allUsers.map(u => [u.id, u]));
   const entries = _actMatchingEntries(s.clientName);
-  const hourlyEntries = entries.filter(e => e.fixed_price == null);
-  const fixedEntries  = entries.filter(e => e.fixed_price != null);
+  const hourlyEntries    = entries.filter(e => e.fixed_price == null);
+  const onorariuEntries  = entries.filter(e => e.fixed_price != null && e.fixed_type !== 'cheltuiala');
+  const cheltuialaEntries = entries.filter(e => e.fixed_price != null && e.fixed_type === 'cheltuiala');
+
+  const priceRow = e => `
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px">${esc(e.description)}</div>
+        <div style="font-size:11px;color:var(--muted)">${fmtDate(e.date)} · ${userMap[e.user_id]?.name || '—'} · standard ${fmtMoney(Number(e.fixed_price))}</div>
+      </div>
+      <input type="number" class="ps-price-override" data-entry-id="${e.id}" min="0" step="50" style="width:110px;flex-shrink:0" value="${s.priceOverrides[e.id] ?? e.fixed_price}">
+    </div>`;
 
   document.getElementById('modal-title').textContent = 'Ajustează tarifele pentru acest act';
   document.getElementById('modal-actions').innerHTML = `
@@ -3733,23 +3744,30 @@ function showActPricingStep() {
         <p style="font-size:12px;color:var(--muted);margin-top:6px">${hourlyEntries.length} intrare${hourlyEntries.length===1?'':'ri'} cu ore vor folosi acest tarif dacă e completat.</p>
       </div>` : ''}
 
-      ${fixedEntries.length ? `
+      ${onorariuEntries.length ? `
       <div>
-        <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px">Prețuri fixe pentru acest act</div>
+        <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px">Prețuri fixe (onorarii) pentru acest act</div>
         <div style="display:flex;flex-direction:column;gap:10px">
-          ${fixedEntries.map(e => `
-            <div style="display:flex;align-items:center;gap:10px">
-              <div style="flex:1;min-width:0">
-                <div style="font-size:13px">${esc(e.description)}</div>
-                <div style="font-size:11px;color:var(--muted)">${fmtDate(e.date)} · ${userMap[e.user_id]?.name || '—'} · standard ${fmtMoney(Number(e.fixed_price))}</div>
-              </div>
-              <input type="number" class="ps-price-override" data-entry-id="${e.id}" min="0" step="50" style="width:110px;flex-shrink:0" value="${s.priceOverrides[e.id] ?? e.fixed_price}">
-            </div>
-          `).join('')}
+          ${onorariuEntries.map(priceRow).join('')}
         </div>
       </div>` : ''}
 
-      ${!hourlyEntries.length && !fixedEntries.length
+      <div>
+        <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px">Cheltuieli (MDL) pentru acest act</div>
+        ${cheltuialaEntries.length
+          ? `<div style="display:flex;flex-direction:column;gap:10px">${cheltuialaEntries.map(priceRow).join('')}</div>`
+          : `<p style="font-size:13px;color:var(--muted)">Nicio cheltuială introdusă de avocați pentru acest client în această perioadă.</p>`
+        }
+        <div style="display:flex;align-items:center;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px">Cheltuieli</div>
+            <div style="font-size:11px;color:var(--muted)">Sumă suplimentară, adăugată manual pentru acest act</div>
+          </div>
+          <input type="number" id="ps-extra-cheltuieli" class="ps-price-override" min="0" step="10" style="width:110px;flex-shrink:0" value="${s.extraCheltuieli || 0}">
+        </div>
+      </div>
+
+      ${!hourlyEntries.length && !onorariuEntries.length && !cheltuialaEntries.length
         ? `<p style="color:var(--muted);font-size:13px">Nicio intrare găsită pentru acest client în perioada selectată.</p>` : ''}
 
       <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:16px;border-top:1px solid var(--border)">
@@ -3765,9 +3783,11 @@ async function finalizeAct() {
   const rateVal = document.getElementById('ps-rate-override')?.value;
   _actFormState.rateOverride = (rateVal !== undefined && rateVal !== '') ? Number(rateVal) : null;
   _actFormState.priceOverrides = {};
-  document.querySelectorAll('.ps-price-override').forEach(inp => {
+  document.querySelectorAll('.ps-price-override[data-entry-id]').forEach(inp => {
     if (inp.value !== '') _actFormState.priceOverrides[inp.dataset.entryId] = Number(inp.value);
   });
+  const extraVal = document.getElementById('ps-extra-cheltuieli')?.value;
+  _actFormState.extraCheltuieli = (extraVal !== undefined && extraVal !== '') ? Number(extraVal) : 0;
   await generateAct();
 }
 
@@ -3815,10 +3835,16 @@ async function generateAct() {
     return fs.priceOverrides[e.id] ?? e.fixed_price;
   }
 
+  const extraCheltuieli = fs.extraCheltuieli || 0;
   const totalOnorariu   = entries.reduce((s, e) => s + (e.fixed_price != null ? entryOnorariu(e) : 0), 0);
-  const totalCheltuieli = entries.reduce((s, e) => s + entryCheltuiala(e), 0);
+  const totalCheltuieli = entries.reduce((s, e) => s + entryCheltuiala(e), 0) + extraCheltuieli;
   const totalEur        = entries.reduce((s, e) => e.fixed_price == null ? s + Number(e.hours) * rateForEntry(e) : s, 0);
   const grandTotal      = totalOnorariu + totalCheltuieli;
+
+  // Rows with a zeroed-out value (e.g. admin overrode a preset to 0) are excluded
+  // from the printed table entirely, rather than showing an empty "—" line.
+  // Totals above still account for every entry regardless of display filtering.
+  const visibleEntries = entries.filter(e => entryOnorariu(e) > 0 || entryCheltuiala(e) > 0);
 
   // birouExtra is charged per client: 100 MDL for every 4000 MDL spent by that client.
   // Group entries by client, compute the extra for each group, then sum.
@@ -3827,6 +3853,10 @@ async function generateAct() {
     const key = (e.client || '').trim() || '__none__';
     _clientTotals[key] = (_clientTotals[key] || 0) + entryOnorariu(e) + entryCheltuiala(e);
   });
+  if (extraCheltuieli > 0) {
+    const key = (clientName || '').trim() || '__none__';
+    _clientTotals[key] = (_clientTotals[key] || 0) + extraCheltuieli;
+  }
   const birouExtra = Object.values(_clientTotals)
     .reduce((s, t) => s + Math.floor(t / 4000) * 100, 0);
 
@@ -3908,7 +3938,7 @@ async function generateAct() {
           </tr>
         </thead>
         <tbody>
-          ${entries.map((e, i) => {
+          ${visibleEntries.map((e, i) => {
             const u    = userMap[e.user_id];
             const hon  = entryOnorariu(e);
             const chel = entryCheltuiala(e);
@@ -3932,9 +3962,15 @@ async function generateAct() {
               </tr>
             `;
           }).join('')}
+          ${extraCheltuieli > 0 ? `
+          <tr>
+            <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${visibleEntries.length + 1}.</td>
+            <td style="border:1px solid #000;padding:5px 6px;" colspan="5">Cheltuieli</td>
+            <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${fmtMoney(extraCheltuieli)}</td>
+          </tr>` : ''}
           ${birouExtra > 0 ? `
           <tr>
-            <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${entries.length + 1}.</td>
+            <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${visibleEntries.length + (extraCheltuieli > 0 ? 2 : 1)}.</td>
             <td style="border:1px solid #000;padding:5px 6px;" colspan="5">Cheltuieli materiale de birou</td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${fmtMoney(birouExtra)}</td>
           </tr>` : ''}
@@ -4006,6 +4042,7 @@ async function generateAct() {
     clientName, contractNr,
     periodStart: state.dateStart, periodEnd: state.dateEnd,
     totalHours, totalEur, totalMdl: grandTotal + birouExtra,
+    totalMdlComplete,
     documentHtml: actDocHtml,
   };
 }
@@ -4026,6 +4063,7 @@ async function saveActToClient() {
     total_hours: d.totalHours,
     total_eur: d.totalEur,
     total_mdl: d.totalMdl,
+    total_mdl_complete: d.totalMdlComplete ?? null,
     document_html: d.documentHtml,
     created_by: currentUser.id,
   }]).select().single();
@@ -4176,6 +4214,7 @@ function showClientReceipts(clientId, event) {
               <th>Perioadă</th>
               <th>Ore</th>
               <th>Total</th>
+              <th>Total (curs BNM)</th>
               <th></th>
             </tr></thead>
             <tbody>
@@ -4184,6 +4223,7 @@ function showClientReceipts(clientId, event) {
                   Number(r.total_mdl) > 0 ? fmtMoney(Number(r.total_mdl)) : null,
                   Number(r.total_eur) > 0 ? Number(r.total_eur).toLocaleString('ro-RO', {maximumFractionDigits:2}) + ' EUR' : null,
                 ].filter(Boolean).join(' + ') || '—';
+                const bnmDisplay = r.total_mdl_complete != null ? fmtMoney(Number(r.total_mdl_complete)) : '—';
                 return `<tr>
                   <td class="reg-nr">${i+1}</td>
                   <td class="td-date">${r.created_at ? fmtDate(r.created_at.split('T')[0]) : '—'}</td>
@@ -4191,6 +4231,7 @@ function showClientReceipts(clientId, event) {
                   <td style="color:var(--muted);font-size:12px">${fmtDate(r.period_start)} – ${fmtDate(r.period_end)}</td>
                   <td class="reg-money">${r.total_hours > 0 ? Number(r.total_hours).toFixed(1) + 'h' : '—'}</td>
                   <td class="reg-total">${totalDisplay}</td>
+                  <td class="reg-total">${bnmDisplay}</td>
                   <td class="td-del">
                     <button class="btn-edit" onclick="viewSavedReport('${r.id}')" aria-label="Deschide actul" title="Deschide"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg></button>
                     <button class="btn-delete" onclick="deleteClientReport('${r.id}')" aria-label="Șterge actul" title="Șterge">✕</button>
