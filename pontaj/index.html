@@ -4281,7 +4281,7 @@ function showClientReceipts(clientId, event) {
                   Number(r.total_eur) > 0 ? Number(r.total_eur).toLocaleString('ro-RO', {maximumFractionDigits:2}) + ' EUR' : null,
                 ].filter(Boolean).join(' + ') || '—';
                 const bnmDisplay = r.total_mdl_complete != null ? fmtMoney(Number(r.total_mdl_complete)) : '—';
-                return `<tr>
+                return `<tr data-report-id="${r.id}">
                   <td class="reg-nr">${i+1}</td>
                   <td class="td-date">${r.created_at ? fmtDate(r.created_at.split('T')[0]) : '—'}</td>
                   <td style="color:var(--muted);font-size:12px">${esc(r.contract_nr)||'—'}</td>
@@ -4291,6 +4291,7 @@ function showClientReceipts(clientId, event) {
                   <td class="reg-total">${bnmDisplay}</td>
                   <td class="td-del">
                     <button class="btn-edit" onclick="viewSavedReport('${r.id}')" aria-label="Deschide actul" title="Deschide"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                    <button class="btn-edit" onclick="editClientReport('${r.id}')" aria-label="Editează datele" title="Editează datele"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
                     <button class="btn-delete" onclick="deleteClientReport('${r.id}')" aria-label="Șterge actul" title="Șterge">✕</button>
                   </td>
                 </tr>`;
@@ -4337,6 +4338,49 @@ async function deleteClientReport(id) {
   const { error } = await db.from('client_reports').delete().eq('id', id);
   if (error) { alert(error.message); return; }
   allClientReports = allClientReports.filter(x => x.id !== id);
+  if (_clientModalId) showClientReceipts(_clientModalId);
+}
+
+function editClientReport(id) {
+  const row = document.querySelector(`tr[data-report-id="${id}"]`);
+  if (!row || row.dataset.editing === '1') return;
+  const r = allClientReports.find(x => x.id === id);
+  if (!r) return;
+  row.dataset.editing = '1';
+  const cells = row.querySelectorAll('td');
+  cells[2].innerHTML = `<input class="tei" type="text" value="${esc(r.contract_nr||'')}" data-f="contract_nr" style="width:110px">`;
+  cells[3].innerHTML = `
+    <input class="tei" type="date" value="${r.period_start||''}" data-f="period_start" style="width:120px">
+    <input class="tei" type="date" value="${r.period_end||''}" data-f="period_end" style="width:120px;margin-top:4px">`;
+  cells[4].innerHTML = `<input class="tei" type="number" value="${r.total_hours||0}" data-f="total_hours" min="0" step="0.1" style="width:72px">`;
+  cells[5].innerHTML = `
+    <input class="tei" type="number" value="${r.total_mdl||0}" data-f="total_mdl" min="0" step="0.01" style="width:90px" placeholder="MDL">
+    <input class="tei" type="number" value="${r.total_eur||0}" data-f="total_eur" min="0" step="0.01" style="width:90px;margin-top:4px" placeholder="EUR">`;
+  cells[6].innerHTML = `<input class="tei" type="number" value="${r.total_mdl_complete ?? ''}" data-f="total_mdl_complete" min="0" step="0.01" style="width:100px" placeholder="curs BNM">`;
+  cells[7].innerHTML = `
+    <button class="btn-edit-save" onclick="saveClientReportEdit('${id}')">✓</button>
+    <button class="btn-edit-cancel" onclick="if(_clientModalId)showClientReceipts(_clientModalId)">✕</button>`;
+}
+
+async function saveClientReportEdit(id) {
+  const row = document.querySelector(`tr[data-report-id="${id}"]`);
+  if (!row) return;
+  const get = f => row.querySelector(`[data-f="${f}"]`)?.value ?? '';
+  const updates = {
+    contract_nr: get('contract_nr').trim() || null,
+    period_start: get('period_start'),
+    period_end: get('period_end'),
+    total_hours: parseFloat(get('total_hours')) || 0,
+    total_mdl: parseFloat(get('total_mdl')) || 0,
+    total_eur: parseFloat(get('total_eur')) || 0,
+    total_mdl_complete: get('total_mdl_complete') === '' ? null : parseFloat(get('total_mdl_complete')),
+  };
+  if (!updates.period_start || !updates.period_end) { alert('Perioada este obligatorie.'); return; }
+  const saveBtn = row.querySelector('.btn-edit-save');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '...'; }
+  const { error } = await db.from('client_reports').update(updates).eq('id', id);
+  if (error) { alert(error.message); if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '✓'; } return; }
+  allClientReports = allClientReports.map(x => x.id === id ? { ...x, ...updates } : x);
   if (_clientModalId) showClientReceipts(_clientModalId);
 }
 
