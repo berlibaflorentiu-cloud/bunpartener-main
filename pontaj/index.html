@@ -3817,7 +3817,7 @@ function showActPricingStep() {
             ${currencyToggleHtml(s.rateOverrideCurrency, `setRateCurrency('MDL')`, `setRateCurrency('EUR')`)}
           </div>
         </div>
-        <p style="font-size:12px;color:var(--muted);margin-top:6px">${hourlyEntries.length} intrare${hourlyEntries.length===1?'':'ri'} cu ore vor folosi acest tarif dacă e completat. Tariful e tot timpul în EUR — butonul MDL doar afișează în act tariful și suma orelor lucrate convertite la cursul BNM din ziua generării, fără să schimbe cifrele reale.</p>
+        <p style="font-size:12px;color:var(--muted);margin-top:6px">${hourlyEntries.length} intrare${hourlyEntries.length===1?'':'ri'} cu ore vor folosi acest tarif dacă e completat. Butonul MDL/EUR doar schimbă eticheta monedei din act, fără nicio conversie a numărului: apare exact tariful standard sau cel scris de tine, urmat de moneda aleasă (ex: tarif standard 70, alegi MDL → 70 MDL; scrii 50 și alegi EUR → 50 EUR).</p>
       </div>` : ''}
 
       ${onorariuEntries.length ? `
@@ -3826,7 +3826,7 @@ function showActPricingStep() {
         <div style="display:flex;flex-direction:column;gap:10px">
           ${onorariuEntries.map(priceRow).join('')}
         </div>
-        <p style="font-size:12px;color:var(--muted);margin-top:6px">Prețurile de mai sus sunt tot timpul în MDL. Pentru Ședința de judecată și Acțiunea de urmărire penală, butonul EUR doar afișează suma respectivă convertită în act la cursul BNM din ziua generării, fără să schimbe cifra reală.</p>
+        <p style="font-size:12px;color:var(--muted);margin-top:6px">Pentru Ședința de judecată și Acțiunea de urmărire penală: butonul MDL/EUR doar schimbă eticheta monedei din act, fără nicio conversie a numărului. Apare exact suma standard sau cea scrisă de tine, urmată de moneda aleasă (ex: sumă standard 2000, alegi EUR → 2000 EUR; scrii 50 și alegi EUR → 50 EUR; scrii 2500 și alegi MDL → 2500 MDL).</p>
       </div>` : ''}
 
       <div>
@@ -3920,13 +3920,28 @@ async function generateAct() {
   const monthNow  = MONTHS[now.getMonth()].toLowerCase();
   const yearNow   = now.getFullYear();
 
+  // Fetch the day's official BNM EUR rate up front — needed whenever a typed
+  // override is denominated in the opposite currency from its native bucket
+  // (e.g. a MDL amount typed in for the EUR-native hourly rate), and for the
+  // "TOTAL GENERAL ÎN MDL" convenience line further down.
+  let bnmRate = null, bnmRateDate = null;
+  if (entries.length > 0) {
+    try {
+      const { data, error } = await db.functions.invoke(`bnm-rate?date=${dayNow}.${monthNowN}.${yearNow}`, { method: 'GET' });
+      if (!error && data && data.eur) { bnmRate = data.eur; bnmRateDate = data.date; }
+    } catch (e) { /* BNM indisponibil — se omite conversia / totalul complet */ }
+  }
+  const rate = bnmRate || 1; // graceful fallback if BNM is unreachable — avoids NaN totals
+
   // Rate/price overrides apply only to this generated act — they never touch
-  // the lawyer's stored rate or the entry's saved fixed_price. Rates are
-  // always entered/stored in EUR and fixed onorarii always in MDL — the
-  // currency toggle in the pricing step only changes how they're *displayed*
-  // on the printed act (see showHourlyMdl / entryDisplayCurrency below).
+  // the lawyer's stored rate or the entry's saved fixed_price.
+  //
+  // The MDL/EUR toggle is a pure text label: it never converts the number.
+  // Whatever value is in play (the standard rate/price, or a manually typed
+  // override) is printed exactly as-is, just followed by whichever currency
+  // is currently selected.
   function rateForEntry(e) {
-    return fs.rateOverride != null ? fs.rateOverride : (userMap[e.user_id]?.rate || 0);
+    return fs.rateOverride ?? (userMap[e.user_id]?.rate || 0);
   }
   function entryOnorariu(e) {
     if (e.fixed_type === 'cheltuiala') return 0;
@@ -3944,25 +3959,8 @@ async function generateAct() {
   const totalEur        = entries.reduce((s, e) => e.fixed_price == null ? s + Number(e.hours) * rateForEntry(e) : s, 0);
   const grandTotal      = totalOnorariu + totalCheltuieli;
 
-  // Fetch the day's BNM EUR rate early whenever it might be needed for a
-  // display conversion (hourly shown in MDL, or a toggleable onorariu item
-  // shown in EUR) — in addition to the original reason (a EUR portion exists,
-  // used for the "TOTAL GENERAL ÎN MDL" convenience line further down).
-  const wantsHourlyMdl = fs.rateOverrideCurrency === 'MDL';
-  const wantsAnyOnorariuEur = entries.some(e =>
-    e.fixed_price != null && CURRENCY_TOGGLE_LABELS.includes(e.description) &&
-    fs.priceOverrideCurrencies[e.id] === 'EUR'
-  );
-  let bnmRate = null, bnmRateDate = null;
-  if (totalEur > 0 || wantsHourlyMdl || wantsAnyOnorariuEur) {
-    try {
-      const { data, error } = await db.functions.invoke(`bnm-rate?date=${dayNow}.${monthNowN}.${yearNow}`, { method: 'GET' });
-      if (!error && data && data.eur) { bnmRate = data.eur; bnmRateDate = data.date; }
-    } catch (e) { /* BNM indisponibil — se omite conversia de afișare / totalul complet */ }
-  }
-  // If the rate couldn't be fetched, silently fall back to each field's
-  // native currency rather than blocking act generation over a display nicety.
-  const showHourlyMdl = wantsHourlyMdl && bnmRate != null;
+  const fmtEur = n => n.toLocaleString('ro-RO', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' EUR';
+  const fmtByCurrency = (n, cur) => cur === 'MDL' ? fmtMoney(n) : fmtEur(n);
 
   // Rows with a zeroed-out value (e.g. admin overrode a preset to 0) are excluded
   // from the printed table entirely, rather than showing an empty "—" line.
@@ -4054,25 +4052,26 @@ async function generateAct() {
             const hon  = entryOnorariu(e);
             const chel = entryCheltuiala(e);
             const hoursDisplay = e.fixed_price != null ? '—' : `${Number(e.hours).toFixed(1)} ore`;
-            const nativeRate   = e.fixed_price != null ? null : rateForEntry(e);
-            const rateDisplay  = e.fixed_price != null ? '—'
-              : showHourlyMdl
-                ? `${Math.round(nativeRate * bnmRate).toLocaleString('ro-RO')} MDL`
-                : `${nativeRate ?? '—'} EUR`;
-            const eurEarned    = e.fixed_price == null ? Number(e.hours) * rateForEntry(e) : 0;
-            // Ședința de judecată / Acțiunea de urmărire penală: shown in EUR on
-            // request, converted from their native MDL amount at the BNM rate.
-            const showOnorariuEur = CURRENCY_TOGGLE_LABELS.includes(e.description)
-              && fs.priceOverrideCurrencies[e.id] === 'EUR' && bnmRate != null;
-            const sumaDisplay  = e.fixed_price != null && hon > 0
-              ? (showOnorariuEur
-                  ? (hon / bnmRate).toLocaleString('ro-RO', {minimumFractionDigits:0, maximumFractionDigits:2}) + ' EUR'
-                  : fmtMoney(hon))
-              : e.fixed_price == null && eurEarned > 0
-                ? (showHourlyMdl
-                    ? fmtMoney(eurEarned * bnmRate)
-                    : eurEarned.toLocaleString('ro-RO', {minimumFractionDigits:0, maximumFractionDigits:2}) + ' EUR')
-                : '—';
+
+            let rateDisplay, sumaDisplay;
+            if (e.fixed_price == null) {
+              // Hourly-billed entry — value never changes, the toggle only relabels the currency.
+              const rateVal = rateForEntry(e);
+              const earned  = Number(e.hours) * rateVal;
+              const cur     = fs.rateOverrideCurrency;
+              rateDisplay = fmtByCurrency(rateVal, cur);
+              sumaDisplay = earned > 0 ? fmtByCurrency(earned, cur) : '—';
+            } else {
+              // Fixed-price entry (onorariu / cheltuiala) — same: value is literal, toggle only relabels.
+              rateDisplay = '—';
+              const isToggleable = CURRENCY_TOGGLE_LABELS.includes(e.description);
+              if (isToggleable) {
+                const cur = fs.priceOverrideCurrencies[e.id] || 'MDL';
+                sumaDisplay = hon > 0 ? fmtByCurrency(hon, cur) : '—';
+              } else {
+                sumaDisplay = hon > 0 ? fmtMoney(hon) : '—';
+              }
+            }
             return `
               <tr>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${i + 1}.</td>
@@ -4103,16 +4102,20 @@ async function generateAct() {
             </td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${totalHours > 0 ? totalHours.toFixed(1) + ' ore' : '—'}</td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">—</td>
-            <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${
-              showHourlyMdl
-                ? (totalEur > 0 || totalOnorariu > 0 ? fmtMoney(totalEur * bnmRate + totalOnorariu) : '—')
-                : totalEur > 0 && totalOnorariu > 0
-                  ? totalEur.toLocaleString('ro-RO', {minimumFractionDigits:0,maximumFractionDigits:2}) + ' EUR + ' + fmtMoney(totalOnorariu)
-                  : totalEur > 0
-                    ? totalEur.toLocaleString('ro-RO', {minimumFractionDigits:0,maximumFractionDigits:2}) + ' EUR'
-                    : totalOnorariu > 0
-                      ? fmtMoney(totalOnorariu)
-                      : '—'
+            <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${(() => {
+              // Toggle is a pure label — totals use the same currency as the rows above.
+              const cur = fs.rateOverrideCurrency;
+              if (cur === 'MDL') {
+                return (totalEur > 0 || totalOnorariu > 0) ? fmtMoney(totalEur + totalOnorariu) : '—';
+              }
+              return totalEur > 0 && totalOnorariu > 0
+                ? fmtEur(totalEur) + ' + ' + fmtMoney(totalOnorariu)
+                : totalEur > 0
+                  ? fmtEur(totalEur)
+                  : totalOnorariu > 0
+                    ? fmtMoney(totalOnorariu)
+                    : '—';
+            })()}
             }</td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${totalCheltuieli + birouExtra > 0 ? fmtMoney(totalCheltuieli + birouExtra) : '—'}</td>
           </tr>
