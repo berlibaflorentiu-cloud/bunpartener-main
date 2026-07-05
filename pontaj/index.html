@@ -272,6 +272,8 @@
       transition: all 0.15s;
     }
     .toggle-btn.active { background: var(--gold); color: var(--bg); }
+    .toggle-group.sm { padding: 2px; flex-shrink: 0; }
+    .toggle-group.sm .toggle-btn { padding: 5px 10px; font-size: 11px; min-height: 0; }
 
     /* ── STATS ── */
     .stats-row { display: flex; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; }
@@ -870,6 +872,7 @@
       .preset-chip { padding: 8px 14px; font-size: 13px; min-height: 44px; }
       .btn-ghost { padding: 9px 14px; min-height: 44px; }
       .toggle-btn { padding: 9px 16px; min-height: 44px; }
+      .toggle-group.sm .toggle-btn { padding: 6px 11px; min-height: 32px; font-size: 12px; }
 
       /* ── ADMIN lawyer cards ── */
       .lawyer-grid { grid-template-columns: 1fr; }
@@ -3749,11 +3752,26 @@ function proceedToPricing() {
     contractNr:   document.getElementById('rf-contract-nr').value.trim(),
     contractDate: document.getElementById('rf-contract-date').value,
     rateOverride: _actFormState?.clientName === clientName ? _actFormState.rateOverride : null,
+    rateOverrideCurrency: _actFormState?.clientName === clientName ? (_actFormState.rateOverrideCurrency || 'EUR') : 'EUR',
     priceOverrides: _actFormState?.clientName === clientName ? _actFormState.priceOverrides : {},
+    priceOverrideCurrencies: _actFormState?.clientName === clientName ? (_actFormState.priceOverrideCurrencies || {}) : {},
     extraCheltuieli: _actFormState?.clientName === clientName ? _actFormState.extraCheltuieli : 0,
   };
 
   showActPricingStep();
+}
+
+// Fixed-price items where the amount can be typed in either currency for this
+// act — the value is converted at generation time using the day's BNM rate.
+// Everything else (Întrevederea la Penitenciar, cheltuieli, etc.) stays MDL-only.
+const CURRENCY_TOGGLE_LABELS = ['Ședința de judecată', 'Acțiunea de urmărire penală'];
+
+function currencyToggleHtml(current, onMdl, onEur) {
+  return `
+    <div class="toggle-group sm" role="group" aria-label="Monedă">
+      <button type="button" class="toggle-btn${current === 'MDL' ? ' active' : ''}" onclick="${onMdl}">MDL</button>
+      <button type="button" class="toggle-btn${current === 'EUR' ? ' active' : ''}" onclick="${onEur}">EUR</button>
+    </div>`;
 }
 
 function showActPricingStep() {
@@ -3764,14 +3782,19 @@ function showActPricingStep() {
   const onorariuEntries  = entries.filter(e => e.fixed_price != null && e.fixed_type !== 'cheltuiala');
   const cheltuialaEntries = entries.filter(e => e.fixed_price != null && e.fixed_type === 'cheltuiala');
 
-  const priceRow = e => `
+  const priceRow = e => {
+    const switchable = CURRENCY_TOGGLE_LABELS.includes(e.description);
+    const cur = s.priceOverrideCurrencies[e.id] || 'MDL';
+    return `
     <div style="display:flex;align-items:center;gap:10px">
       <div style="flex:1;min-width:0">
         <div style="font-size:13px">${esc(e.description)}</div>
         <div style="font-size:11px;color:var(--muted)">${fmtDate(e.date)} · ${userMap[e.user_id]?.name || '—'} · standard ${fmtMoney(Number(e.fixed_price))}</div>
       </div>
+      ${switchable ? currencyToggleHtml(cur, `setPriceCurrency('${e.id}','MDL')`, `setPriceCurrency('${e.id}','EUR')`) : ''}
       <input type="number" class="ps-price-override" data-entry-id="${e.id}" min="0" step="50" style="width:110px;flex-shrink:0" value="${s.priceOverrides[e.id] ?? e.fixed_price}">
     </div>`;
+  };
 
   document.getElementById('modal-title').textContent = 'Ajustează tarifele pentru acest act';
   document.getElementById('modal-actions').innerHTML = `
@@ -3789,9 +3812,12 @@ function showActPricingStep() {
         <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px">Tarif orar pentru acest contract</div>
         <div class="field">
           <label>Tarif (EUR/h) — lasă gol pentru tariful standard al fiecărui avocat</label>
-          <input type="number" id="ps-rate-override" min="0" step="10" placeholder="tarif standard" value="${s.rateOverride ?? ''}">
+          <div style="display:flex;align-items:center;gap:10px">
+            <input type="number" id="ps-rate-override" min="0" step="10" placeholder="tarif standard" value="${s.rateOverride ?? ''}" style="flex:1;min-width:0">
+            ${currencyToggleHtml(s.rateOverrideCurrency, `setRateCurrency('MDL')`, `setRateCurrency('EUR')`)}
+          </div>
         </div>
-        <p style="font-size:12px;color:var(--muted);margin-top:6px">${hourlyEntries.length} intrare${hourlyEntries.length===1?'':'ri'} cu ore vor folosi acest tarif dacă e completat.</p>
+        <p style="font-size:12px;color:var(--muted);margin-top:6px">${hourlyEntries.length} intrare${hourlyEntries.length===1?'':'ri'} cu ore vor folosi acest tarif dacă e completat. Tariful e tot timpul în EUR — butonul MDL doar afișează în act tariful și suma orelor lucrate convertite la cursul BNM din ziua generării, fără să schimbe cifrele reale.</p>
       </div>` : ''}
 
       ${onorariuEntries.length ? `
@@ -3800,6 +3826,7 @@ function showActPricingStep() {
         <div style="display:flex;flex-direction:column;gap:10px">
           ${onorariuEntries.map(priceRow).join('')}
         </div>
+        <p style="font-size:12px;color:var(--muted);margin-top:6px">Prețurile de mai sus sunt tot timpul în MDL. Pentru Ședința de judecată și Acțiunea de urmărire penală, butonul EUR doar afișează suma respectivă convertită în act la cursul BNM din ziua generării, fără să schimbe cifra reală.</p>
       </div>` : ''}
 
       <div>
@@ -3829,7 +3856,10 @@ function showActPricingStep() {
   document.getElementById('modal-overlay').style.display = 'flex';
 }
 
-async function finalizeAct() {
+// Reads whatever is currently typed in the pricing-step inputs back into
+// _actFormState, without discarding it — used before both re-rendering (e.g.
+// on a currency toggle click) and before generating the act.
+function syncPricingInputsToState() {
   const rateVal = document.getElementById('ps-rate-override')?.value;
   _actFormState.rateOverride = (rateVal !== undefined && rateVal !== '') ? Number(rateVal) : null;
   _actFormState.priceOverrides = {};
@@ -3838,6 +3868,22 @@ async function finalizeAct() {
   });
   const extraVal = document.getElementById('ps-extra-cheltuieli')?.value;
   _actFormState.extraCheltuieli = (extraVal !== undefined && extraVal !== '') ? Number(extraVal) : 0;
+}
+
+function setRateCurrency(cur) {
+  syncPricingInputsToState();
+  _actFormState.rateOverrideCurrency = cur;
+  showActPricingStep();
+}
+
+function setPriceCurrency(entryId, cur) {
+  syncPricingInputsToState();
+  _actFormState.priceOverrideCurrencies[entryId] = cur;
+  showActPricingStep();
+}
+
+async function finalizeAct() {
+  syncPricingInputsToState();
   await generateAct();
 }
 
@@ -3869,9 +3915,16 @@ async function generateAct() {
 
   const entries = _actMatchingEntries(clientName);
   const totalHours = sumH(entries);
+  const dayNow    = String(now.getDate()).padStart(2,'0');
+  const monthNowN = String(now.getMonth() + 1).padStart(2,'0');
+  const monthNow  = MONTHS[now.getMonth()].toLowerCase();
+  const yearNow   = now.getFullYear();
 
   // Rate/price overrides apply only to this generated act — they never touch
-  // the lawyer's stored rate or the entry's saved fixed_price.
+  // the lawyer's stored rate or the entry's saved fixed_price. Rates are
+  // always entered/stored in EUR and fixed onorarii always in MDL — the
+  // currency toggle in the pricing step only changes how they're *displayed*
+  // on the printed act (see showHourlyMdl / entryDisplayCurrency below).
   function rateForEntry(e) {
     return fs.rateOverride != null ? fs.rateOverride : (userMap[e.user_id]?.rate || 0);
   }
@@ -3890,6 +3943,26 @@ async function generateAct() {
   const totalCheltuieli = entries.reduce((s, e) => s + entryCheltuiala(e), 0) + extraCheltuieli;
   const totalEur        = entries.reduce((s, e) => e.fixed_price == null ? s + Number(e.hours) * rateForEntry(e) : s, 0);
   const grandTotal      = totalOnorariu + totalCheltuieli;
+
+  // Fetch the day's BNM EUR rate early whenever it might be needed for a
+  // display conversion (hourly shown in MDL, or a toggleable onorariu item
+  // shown in EUR) — in addition to the original reason (a EUR portion exists,
+  // used for the "TOTAL GENERAL ÎN MDL" convenience line further down).
+  const wantsHourlyMdl = fs.rateOverrideCurrency === 'MDL';
+  const wantsAnyOnorariuEur = entries.some(e =>
+    e.fixed_price != null && CURRENCY_TOGGLE_LABELS.includes(e.description) &&
+    fs.priceOverrideCurrencies[e.id] === 'EUR'
+  );
+  let bnmRate = null, bnmRateDate = null;
+  if (totalEur > 0 || wantsHourlyMdl || wantsAnyOnorariuEur) {
+    try {
+      const { data, error } = await db.functions.invoke(`bnm-rate?date=${dayNow}.${monthNowN}.${yearNow}`, { method: 'GET' });
+      if (!error && data && data.eur) { bnmRate = data.eur; bnmRateDate = data.date; }
+    } catch (e) { /* BNM indisponibil — se omite conversia de afișare / totalul complet */ }
+  }
+  // If the rate couldn't be fetched, silently fall back to each field's
+  // native currency rather than blocking act generation over a display nicety.
+  const showHourlyMdl = wantsHourlyMdl && bnmRate != null;
 
   // Rows with a zeroed-out value (e.g. admin overrode a preset to 0) are excluded
   // from the printed table entirely, rather than showing an empty "—" line.
@@ -3911,20 +3984,6 @@ async function generateAct() {
     .reduce((s, t) => s + Math.floor(t / 4000) * 100, 0);
 
   const contractDateFmt = contractDate ? fmtDate(contractDate) : '___________';
-  const dayNow    = String(now.getDate()).padStart(2,'0');
-  const monthNowN = String(now.getMonth() + 1).padStart(2,'0');
-  const monthNow  = MONTHS[now.getMonth()].toLowerCase();
-  const yearNow   = now.getFullYear();
-
-  // Fetch today's BNM (National Bank of Moldova) EUR rate to show a complete MDL total
-  // alongside the mixed EUR+MDL total. Only relevant when part of the act is in EUR.
-  let bnmRate = null, bnmRateDate = null;
-  if (totalEur > 0) {
-    try {
-      const { data, error } = await db.functions.invoke(`bnm-rate?date=${dayNow}.${monthNowN}.${yearNow}`, { method: 'GET' });
-      if (!error && data && data.eur) { bnmRate = data.eur; bnmRateDate = data.date; }
-    } catch (e) { /* BNM indisponibil — se omite totalul complet în MDL */ }
-  }
   const totalMdlComplete = bnmRate != null
     ? Math.round(totalEur * bnmRate) + totalOnorariu + totalCheltuieli + birouExtra
     : null;
@@ -3995,12 +4054,24 @@ async function generateAct() {
             const hon  = entryOnorariu(e);
             const chel = entryCheltuiala(e);
             const hoursDisplay = e.fixed_price != null ? '—' : `${Number(e.hours).toFixed(1)} ore`;
-            const rateDisplay  = e.fixed_price != null ? '—' : `${rateForEntry(e) ?? '—'} EUR`;
+            const nativeRate   = e.fixed_price != null ? null : rateForEntry(e);
+            const rateDisplay  = e.fixed_price != null ? '—'
+              : showHourlyMdl
+                ? `${Math.round(nativeRate * bnmRate).toLocaleString('ro-RO')} MDL`
+                : `${nativeRate ?? '—'} EUR`;
             const eurEarned    = e.fixed_price == null ? Number(e.hours) * rateForEntry(e) : 0;
+            // Ședința de judecată / Acțiunea de urmărire penală: shown in EUR on
+            // request, converted from their native MDL amount at the BNM rate.
+            const showOnorariuEur = CURRENCY_TOGGLE_LABELS.includes(e.description)
+              && fs.priceOverrideCurrencies[e.id] === 'EUR' && bnmRate != null;
             const sumaDisplay  = e.fixed_price != null && hon > 0
-              ? fmtMoney(hon)
+              ? (showOnorariuEur
+                  ? (hon / bnmRate).toLocaleString('ro-RO', {minimumFractionDigits:0, maximumFractionDigits:2}) + ' EUR'
+                  : fmtMoney(hon))
               : e.fixed_price == null && eurEarned > 0
-                ? eurEarned.toLocaleString('ro-RO', {minimumFractionDigits:0, maximumFractionDigits:2}) + ' EUR'
+                ? (showHourlyMdl
+                    ? fmtMoney(eurEarned * bnmRate)
+                    : eurEarned.toLocaleString('ro-RO', {minimumFractionDigits:0, maximumFractionDigits:2}) + ' EUR')
                 : '—';
             return `
               <tr>
@@ -4033,13 +4104,15 @@ async function generateAct() {
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${totalHours > 0 ? totalHours.toFixed(1) + ' ore' : '—'}</td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">—</td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${
-              totalEur > 0 && totalOnorariu > 0
-                ? totalEur.toLocaleString('ro-RO', {minimumFractionDigits:0,maximumFractionDigits:2}) + ' EUR + ' + fmtMoney(totalOnorariu)
-                : totalEur > 0
-                  ? totalEur.toLocaleString('ro-RO', {minimumFractionDigits:0,maximumFractionDigits:2}) + ' EUR'
-                  : totalOnorariu > 0
-                    ? fmtMoney(totalOnorariu)
-                    : '—'
+              showHourlyMdl
+                ? (totalEur > 0 || totalOnorariu > 0 ? fmtMoney(totalEur * bnmRate + totalOnorariu) : '—')
+                : totalEur > 0 && totalOnorariu > 0
+                  ? totalEur.toLocaleString('ro-RO', {minimumFractionDigits:0,maximumFractionDigits:2}) + ' EUR + ' + fmtMoney(totalOnorariu)
+                  : totalEur > 0
+                    ? totalEur.toLocaleString('ro-RO', {minimumFractionDigits:0,maximumFractionDigits:2}) + ' EUR'
+                    : totalOnorariu > 0
+                      ? fmtMoney(totalOnorariu)
+                      : '—'
             }</td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${totalCheltuieli + birouExtra > 0 ? fmtMoney(totalCheltuieli + birouExtra) : '—'}</td>
           </tr>
