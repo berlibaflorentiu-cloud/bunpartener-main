@@ -3982,9 +3982,23 @@ async function generateAct() {
     .reduce((s, t) => s + Math.floor(t / 4000) * 100, 0);
 
   const contractDateFmt = contractDate ? fmtDate(contractDate) : '___________';
-  const totalMdlComplete = bnmRate != null
-    ? Math.round(totalEur * bnmRate) + totalOnorariu + totalCheltuieli + birouExtra
-    : null;
+  // Convert each entry to MDL using its displayed currency so the grand total matches what's shown in the table.
+  const totalMdlComplete = bnmRate != null ? (() => {
+    let mdl = 0;
+    entries.forEach(e => {
+      if (e.fixed_price == null) {
+        const amt = Number(e.hours) * rateForEntry(e);
+        mdl += fs.rateOverrideCurrency === 'EUR' ? amt * bnmRate : amt;
+      } else if (e.fixed_type !== 'cheltuiala' && e.fixed_price != null) {
+        const amt = entryOnorariu(e);
+        const cur = CURRENCY_TOGGLE_LABELS.includes(e.description)
+          ? (fs.priceOverrideCurrencies[e.id] || 'MDL') : 'MDL';
+        mdl += cur === 'EUR' ? amt * bnmRate : amt;
+      }
+    });
+    mdl += totalCheltuieli + birouExtra;
+    return Math.round(mdl);
+  })() : null;
   const firmDisplay   = firm || 'BIROUL ASOCIAT DE AVOCAȚI';
   const coordDisplay  = coordinator || '___________';
   const clientDisplay = clientName || '___________';
@@ -4103,20 +4117,24 @@ async function generateAct() {
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${totalHours > 0 ? totalHours.toFixed(1) + ' ore' : '—'}</td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">—</td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${(() => {
-              // Toggle is a pure label — totals use the same currency as the rows above.
-              const cur = fs.rateOverrideCurrency;
-              if (cur === 'MDL') {
-                return (totalEur > 0 || totalOnorariu > 0) ? fmtMoney(totalEur + totalOnorariu) : '—';
-              }
-              return totalEur > 0 && totalOnorariu > 0
-                ? fmtEur(totalEur) + ' + ' + fmtMoney(totalOnorariu)
-                : totalEur > 0
-                  ? fmtEur(totalEur)
-                  : totalOnorariu > 0
-                    ? fmtMoney(totalOnorariu)
-                    : '—';
-            })()}
-            }</td>
+              // Sum each row's amount into the bucket matching its displayed currency.
+              let eurSum = 0, mdlSum = 0;
+              entries.forEach(e => {
+                if (e.fixed_price == null) {
+                  const amt = Number(e.hours) * rateForEntry(e);
+                  if (fs.rateOverrideCurrency === 'EUR') eurSum += amt; else mdlSum += amt;
+                } else if (e.fixed_type !== 'cheltuiala' && e.fixed_price != null) {
+                  const amt = entryOnorariu(e);
+                  const cur = CURRENCY_TOGGLE_LABELS.includes(e.description)
+                    ? (fs.priceOverrideCurrencies[e.id] || 'MDL') : 'MDL';
+                  if (cur === 'EUR') eurSum += amt; else mdlSum += amt;
+                }
+              });
+              const parts = [];
+              if (eurSum > 0) parts.push(fmtEur(eurSum));
+              if (mdlSum > 0) parts.push(fmtMoney(mdlSum));
+              return parts.length ? parts.join(' + ') : '—';
+            })()}</td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${totalCheltuieli + birouExtra > 0 ? fmtMoney(totalCheltuieli + birouExtra) : '—'}</td>
           </tr>
         </tbody>
