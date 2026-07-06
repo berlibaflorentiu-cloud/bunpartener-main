@@ -1497,13 +1497,6 @@ function fmtDate(s) {
   const [y,m,d] = s.split('-'); return `${d}.${m}.${y}`;
 }
 
-// Romanian long-form date, matching how contract dates are written in legal
-// documents (e.g. "23 ianuarie 2026") rather than the numeric dd.mm.yyyy.
-function fmtDateRo(s) {
-  const [y,m,d] = s.split('-');
-  return `${Number(d)} ${MONTHS[Number(m)-1].toLowerCase()} ${y}`;
-}
-
 function fmtMoney(n) {
   return n.toLocaleString('ro-RO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' MDL';
 }
@@ -2634,7 +2627,7 @@ function renderClienti(container) {
                   </div>
                 </div>
                 <div class="lsc-name" style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:${done ? '#b07878' : 'var(--gold)'};letter-spacing:-.01em;line-height:1.3">${esc(dispName)}</div>
-                <div class="lsc-contract" style="font-size:12px;color:var(--muted);margin-top:2px;margin-bottom:10px;line-height:1.4">${c.notes ? esc(c.notes) : '—'}${c.contract_date ? ` <span style="opacity:.75">din ${fmtDateRo(c.contract_date)}</span>` : ''}</div>
+                <div class="lsc-contract" style="font-size:12px;color:var(--muted);margin-top:2px;margin-bottom:10px;line-height:1.4">${c.notes ? esc(c.notes) : '—'}${c.contract_date ? ` <span style="opacity:.75">· ${fmtDate(c.contract_date)}</span>` : ''}</div>
                 <div class="lsc-row"><span>Intrări</span><span>${cnt}</span></div>
                 <div class="lsc-row"><span>Facturi</span><span>${invCt}</span></div>
                 <div class="lsc-row"><span>Chitanțe</span><span>${rcptCt}</span></div>
