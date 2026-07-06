@@ -563,6 +563,7 @@
       white-space: nowrap;
     }
     .preset-chip:hover { border-color: var(--gold); color: var(--gold); }
+    .preset-chip.active { border-color: var(--gold); color: var(--gold); background: rgba(200,169,110,0.13); }
     .range-inputs {
       display: flex;
       align-items: center;
@@ -1079,7 +1080,7 @@ function initDateRange() {
   };
 }
 const _dr = initDateRange();
-const state = { dateStart: _dr.start, dateEnd: _dr.end, filterUser: 'all', viewMode: 'admin', customGroup: [], adminTab: 'pontaj', clientiSearch: '', clientiStatus: 'all', registruSearch: '', pontajPage: 1, registruPage: 1, avocatTab: 'pontaj' };
+const state = { dateStart: _dr.start, dateEnd: _dr.end, filterUser: 'all', viewMode: 'admin', customGroup: [], adminTab: 'pontaj', clientiSearch: '', clientiStatus: 'all', registruSearch: '', pontajPage: 1, registruPage: 1, avocatTab: 'pontaj', activePreset: '30d' };
 const PAGE_SIZE = 30;
 function isAdmin(u) { return u?.role === 'admin' || u?.role === 'owner'; }
 
@@ -1618,7 +1619,7 @@ function render() {
   }
 }
 
-function setDateRange(start, end) { state.dateStart = start; state.dateEnd = end; state.pontajPage = 1; render(); }
+function setDateRange(start, end, preset = null) { state.dateStart = start; state.dateEnd = end; state.pontajPage = 1; state.activePreset = preset; render(); }
 function setFilterUser(id) { state.filterUser = id; state.pontajPage = 1; render(); }
 function toggleGroupMember(id) {
   const i = state.customGroup.indexOf(id);
@@ -1635,21 +1636,21 @@ function quickRange(preset) {
     const day = now.getDay() || 7;
     const mon = new Date(now); mon.setDate(now.getDate() - day + 1);
     const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-    setDateRange(mon.toISOString().split('T')[0], sun.toISOString().split('T')[0]);
+    setDateRange(mon.toISOString().split('T')[0], sun.toISOString().split('T')[0], preset);
   } else if (preset === 'month') {
     const last = new Date(y, m, 0).getDate();
-    setDateRange(`${y}-${String(m).padStart(2,'0')}-01`, `${y}-${String(m).padStart(2,'0')}-${String(last).padStart(2,'0')}`);
+    setDateRange(`${y}-${String(m).padStart(2,'0')}-01`, `${y}-${String(m).padStart(2,'0')}-${String(last).padStart(2,'0')}`, preset);
   } else if (preset === 'lastmonth') {
     const pm = m === 1 ? 12 : m - 1, py = m === 1 ? y - 1 : y;
     const last = new Date(py, pm, 0).getDate();
-    setDateRange(`${py}-${String(pm).padStart(2,'0')}-01`, `${py}-${String(pm).padStart(2,'0')}-${String(last).padStart(2,'0')}`);
+    setDateRange(`${py}-${String(pm).padStart(2,'0')}-01`, `${py}-${String(pm).padStart(2,'0')}-${String(last).padStart(2,'0')}`, preset);
   } else if (preset === '30d') {
     const from = new Date(now); from.setDate(now.getDate() - 29);
-    setDateRange(from.toISOString().split('T')[0], today);
+    setDateRange(from.toISOString().split('T')[0], today, preset);
   } else if (preset === 'all') {
     const validDates = allEntries.map(e => e.date).filter(d => d && d >= '2000-01-01');
     const earliest = validDates.length ? validDates.reduce((min, d) => d < min ? d : min, today) : today;
-    setDateRange(earliest, today);
+    setDateRange(earliest, today, preset);
   }
 }
 
@@ -1657,11 +1658,11 @@ function rangePicker() {
   return `
     <div class="range-picker">
       <div class="range-presets">
-        <button class="preset-chip" onclick="quickRange('week')">Săpt. curentă</button>
-        <button class="preset-chip" onclick="quickRange('month')">Luna curentă</button>
-        <button class="preset-chip" onclick="quickRange('lastmonth')">Luna trecută</button>
-        <button class="preset-chip" onclick="quickRange('30d')">Ultimele 30 zile</button>
-        <button class="preset-chip" onclick="quickRange('all')">Total</button>
+        <button class="preset-chip${state.activePreset==='week'?' active':''}" onclick="quickRange('week')">Săpt. curentă</button>
+        <button class="preset-chip${state.activePreset==='month'?' active':''}" onclick="quickRange('month')">Luna curentă</button>
+        <button class="preset-chip${state.activePreset==='lastmonth'?' active':''}" onclick="quickRange('lastmonth')">Luna trecută</button>
+        <button class="preset-chip${state.activePreset==='30d'?' active':''}" onclick="quickRange('30d')">Ultimele 30 zile</button>
+        <button class="preset-chip${state.activePreset==='all'?' active':''}" onclick="quickRange('all')">Total</button>
       </div>
       <div class="range-inputs">
         <input type="date" class="range-date-input" value="${state.dateStart}" max="${todayStr()}"
