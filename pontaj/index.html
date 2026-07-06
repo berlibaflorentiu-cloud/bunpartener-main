@@ -4253,7 +4253,18 @@ async function downloadDocx() {
   clone.removeAttribute('spellcheck');
   // Word doesn't render data: URIs — swap to hosted URL so it loads correctly
   const cloneLogo = clone.querySelector('img');
-  if (cloneLogo) cloneLogo.src = 'https://bunpartener.md/pontaj/BU_logo_highres_white_background.png';
+  if (cloneLogo) {
+    // Word's HTML import ignores CSS width/height on <img> and falls back to the
+    // source file's native pixel size — bake the rendered size in as HTML attributes.
+    const liveLogo = el.querySelector('img');
+    const h = liveLogo?.clientHeight || 72;
+    const w = liveLogo?.clientWidth || h;
+    cloneLogo.src = 'https://bunpartener.md/pontaj/BU_logo_highres_white_background.png';
+    cloneLogo.setAttribute('width', w);
+    cloneLogo.setAttribute('height', h);
+    cloneLogo.style.width = w + 'px';
+    cloneLogo.style.height = h + 'px';
+  }
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body { font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5; margin: 0; }
