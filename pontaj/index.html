@@ -1646,6 +1646,9 @@ function quickRange(preset) {
   } else if (preset === '30d') {
     const from = new Date(now); from.setDate(now.getDate() - 29);
     setDateRange(from.toISOString().split('T')[0], today);
+  } else if (preset === 'all') {
+    const earliest = allEntries.reduce((min, e) => e.date < min ? e.date : min, today);
+    setDateRange(earliest, today);
   }
 }
 
@@ -1657,6 +1660,7 @@ function rangePicker() {
         <button class="preset-chip" onclick="quickRange('month')">Luna curentă</button>
         <button class="preset-chip" onclick="quickRange('lastmonth')">Luna trecută</button>
         <button class="preset-chip" onclick="quickRange('30d')">Ultimele 30 zile</button>
+        <button class="preset-chip" onclick="quickRange('all')">Total</button>
       </div>
       <div class="range-inputs">
         <input type="date" class="range-date-input" value="${state.dateStart}" max="${todayStr()}"
