@@ -306,7 +306,7 @@
     }
     .client-add-grid {
       display: grid;
-      grid-template-columns: 1fr 1.6fr auto auto;
+      grid-template-columns: 1fr 1.3fr 0.9fr auto auto;
       gap: 12px;
       align-items: end;
     }
@@ -2539,7 +2539,7 @@ function renderClienti(container) {
     if (sf === 'finalized' && !isClientFinalized(c)) return false;
     return true;
   }).slice().sort((a, b) => {
-    const ka = contractSortKey(a.notes), kb = contractSortKey(b.notes);
+    const ka = contractSortKey(a), kb = contractSortKey(b);
     if (kb !== ka) return kb.localeCompare(ka); // most recent first
     return a.name.localeCompare(b.name);         // tie-break alphabetically
   });
@@ -2554,7 +2554,11 @@ function renderClienti(container) {
         </div>
         <div class="field">
           <label>Nr. Contract</label>
-          <input type="text" id="c-contract" placeholder="ex. VB-17.285/03-24" autocorrect="off" onkeydown="if(event.key==='Enter')addClient()">
+          <input type="text" id="c-contract" placeholder="ex. VB-17.285" autocorrect="off" onkeydown="if(event.key==='Enter')addClient()">
+        </div>
+        <div class="field">
+          <label>Data contractului</label>
+          <input type="date" id="c-contract-date" onkeydown="if(event.key==='Enter')addClient()">
         </div>
         <button class="btn-primary" id="btn-add-client" onclick="addClient()" style="padding:9px 22px">Adaugă</button>
         <button onclick="openExportClientiModal()" style="display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:13px;cursor:pointer;transition:all .15s;white-space:nowrap" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exportă CSV</button>
@@ -2606,7 +2610,7 @@ function renderClienti(container) {
                   </div>
                 </div>
                 <div class="lsc-name" style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:${done ? '#b07878' : 'var(--gold)'};letter-spacing:-.01em;line-height:1.3">${esc(dispName)}</div>
-                <div class="lsc-contract" style="font-size:12px;color:var(--muted);margin-top:2px;margin-bottom:10px;line-height:1.4">${c.notes ? esc(c.notes) : '—'}</div>
+                <div class="lsc-contract" style="font-size:12px;color:var(--muted);margin-top:2px;margin-bottom:10px;line-height:1.4">${c.notes ? esc(c.notes) : '—'}${c.contract_date ? ` <span style="opacity:.75">· ${fmtDate(c.contract_date)}</span>` : ''}</div>
                 <div class="lsc-row"><span>Intrări</span><span>${cnt}</span></div>
                 <div class="lsc-row"><span>Facturi</span><span>${invCt}</span></div>
                 <div class="lsc-row"><span>Chitanțe</span><span>${rcptCt}</span></div>
@@ -2623,12 +2627,13 @@ async function addClient() {
   const nameEl = document.getElementById('c-name');
   const name   = nameEl?.value.trim();
   if (!name) { nameEl?.focus(); return; }
-  const contractNr = document.getElementById('c-contract')?.value.trim() || null;
+  const contractNr   = document.getElementById('c-contract')?.value.trim() || null;
+  const contractDate = document.getElementById('c-contract-date')?.value || null;
   const btn = document.getElementById('btn-add-client');
   if (btn) { btn.disabled = true; btn.textContent = '...'; }
 
   const { data, error } = await db.from('clients')
-    .insert({ name, notes: contractNr, created_by: currentUser.id })
+    .insert({ name, notes: contractNr, contract_date: contractDate, created_by: currentUser.id })
     .select().single();
   if (btn) { btn.disabled = false; btn.textContent = 'Adaugă'; }
   if (error) { alert(error.message); return; }
@@ -2643,27 +2648,17 @@ function isClientFinalized(c) {
 }
 
 // Extract 4-digit year from a contract notes string (e.g. "VB-32.437/07-25 din 10 iulie 2025" → "2025")
-function contractYear(notes) {
-  if (!notes) return null;
-  const m = notes.match(/\b(20\d{2})\b/);
-  return m ? m[1] : null;
+function contractYear(client) {
+  return client?.contract_date ? client.contract_date.slice(0, 4) : null;
 }
 
-// Returns a YYYY-MM sort key from a contract notes string for chronological ordering.
-// Uses /MM-YY from the contract number (e.g. "/07-25" → "2025-07").
-// Falls back to year-only, then empty string (no date → sorts last).
-function contractSortKey(notes) {
-  if (!notes) return '';
-  const mMY  = notes.match(/\/(\d{2})-(\d{2})\b/);
-  const mSeq = notes.match(/VB-\d+\.(\d+)/i);
+// Returns a YYYY-MM-DD sort key from the client's contract_date for chronological
+// ordering, tie-broken by the contract's sequence number. Empty string (no date) sorts last.
+function contractSortKey(client) {
+  if (!client) return '';
+  const mSeq = (client.notes || '').match(/VB-\d+\.(\d+)/i);
   const seq  = mSeq ? mSeq[1].padStart(8, '0') : '00000000';
-  if (mMY) {
-    const mDay = notes.match(/\bdin\s+(\d{1,2})\b/i);
-    const day  = mDay ? mDay[1].padStart(2, '0') : '00';
-    return '20' + mMY[2] + '-' + mMY[1] + '-' + day + '-' + seq;
-  }
-  const y = contractYear(notes);
-  return y ? y + '-00-00-' + seq : '';
+  return client.contract_date ? client.contract_date + '-' + seq : '';
 }
 
 function filterClientiStatus(s) {
@@ -2674,7 +2669,7 @@ function filterClientiStatus(s) {
 function openExportClientiModal() {
   // Collect distinct years from contract notes (e.g. "din 10 iulie 2025" or "/07-25")
   const yearSet = new Set();
-  allClients.forEach(c => { const y = contractYear(c.notes); if (y) yearSet.add(y); });
+  allClients.forEach(c => { const y = contractYear(c); if (y) yearSet.add(y); });
   const years = Array.from(yearSet).sort().reverse();
 
   document.getElementById('modal-title').innerHTML = `<span style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--gold)">Exportă clienți CSV</span>`;
@@ -2756,7 +2751,7 @@ function generateClientiCSV() {
 
   // Filter by year from contract number
   if (yearFilter !== 'all') {
-    clients = clients.filter(c => contractYear(c.notes) === yearFilter);
+    clients = clients.filter(c => contractYear(c) === yearFilter);
   }
 
   // Build header
@@ -2838,7 +2833,8 @@ function editClient(id) {
   card.querySelector('.lsc-name').outerHTML =
     `<input class="tei" type="text" value="${esc(c.name)}" data-f="name" style="width:100%;margin-bottom:6px" onkeydown="if(event.key==='Enter')saveClientEdit('${id}')">`;
   card.querySelector('.lsc-contract').outerHTML =
-    `<input class="tei" type="text" value="${esc(c.notes||'')}" data-f="notes" placeholder="Nr. Contract" style="width:100%;margin-bottom:8px;font-size:12px" onkeydown="if(event.key==='Enter')saveClientEdit('${id}')">
+    `<input class="tei" type="text" value="${esc(c.notes||'')}" data-f="notes" placeholder="Nr. Contract" style="width:100%;margin-bottom:6px;font-size:12px" onkeydown="if(event.key==='Enter')saveClientEdit('${id}')">
+     <input class="tei" type="date" value="${c.contract_date||''}" data-f="contract_date" style="width:100%;margin-bottom:8px;font-size:12px" onkeydown="if(event.key==='Enter')saveClientEdit('${id}')">
      <div class="lsc-edit-actions" style="display:flex;gap:6px;margin-bottom:10px">
        <button class="btn-edit-save" onclick="saveClientEdit('${id}')" title="Salvează">✓ Salvează</button>
        <button class="btn-edit-cancel" onclick="renderAdminTabContent()" title="Anulează">✕ Anulează</button>
@@ -2849,14 +2845,15 @@ async function saveClientEdit(id) {
   const card = document.querySelector(`[data-client-id="${id}"]`);
   if (!card) return;
   const get = f => card.querySelector(`[data-f="${f}"]`)?.value ?? '';
-  const name  = get('name').trim();
-  const notes = get('notes').trim() || null;
+  const name         = get('name').trim();
+  const notes        = get('notes').trim() || null;
+  const contractDate = get('contract_date') || null;
   if (!name) { alert('Numele este obligatoriu.'); return; }
   const saveBtn = card.querySelector('.btn-edit-save');
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '...'; }
-  const { error } = await db.from('clients').update({ name, notes }).eq('id', id);
+  const { error } = await db.from('clients').update({ name, notes, contract_date: contractDate }).eq('id', id);
   if (error) { alert(error.message); if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '✓'; } return; }
-  allClients = allClients.map(x => x.id === id ? { ...x, name, notes } : x);
+  allClients = allClients.map(x => x.id === id ? { ...x, name, notes, contract_date: contractDate } : x);
   allClients.sort((a,b) => a.name.localeCompare(b.name));
   renderAdminTabContent();
 }
@@ -2935,7 +2932,7 @@ function contractDateFromNotes(notes) {
 function autofillContractDate(inputEl, client) {
   const targetId = CONTRACT_DATE_TARGETS[inputEl.id];
   if (!targetId) return;
-  const dateStr = contractDateFromNotes(client.notes);
+  const dateStr = client.contract_date || contractDateFromNotes(client.notes);
   if (!dateStr) return;
   const target = document.getElementById(targetId);
   if (target) target.value = dateStr;
