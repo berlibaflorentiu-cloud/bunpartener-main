@@ -572,6 +572,10 @@
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 4px 10px;
+      transition: border-color 0.15s;
+    }
+    .range-inputs:hover, .range-inputs:focus-within {
+      border-color: var(--gold);
     }
     .range-date-input {
       background: none;
@@ -582,8 +586,19 @@
       outline: none;
       cursor: pointer;
       padding: 4px 2px;
+      color-scheme: dark;
     }
-    .range-date-input::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: pointer; }
+    .range-date-input::-webkit-calendar-picker-indicator {
+      filter: invert(75%) sepia(35%) saturate(500%) brightness(0.95);
+      cursor: pointer;
+      border-radius: 4px;
+      padding: 2px;
+      transition: filter 0.15s, background 0.15s;
+    }
+    .range-date-input::-webkit-calendar-picker-indicator:hover {
+      filter: invert(85%) sepia(45%) saturate(600%) brightness(1.05);
+      background: rgba(200,169,110,0.13);
+    }
     .range-sep { color: var(--muted); font-size: 14px; }
 
     .empty-state { text-align: center; padding: 56px 24px; color: var(--muted); }
@@ -1482,6 +1497,13 @@ function fmtDate(s) {
   const [y,m,d] = s.split('-'); return `${d}.${m}.${y}`;
 }
 
+// Romanian long-form date, matching how contract dates are written in legal
+// documents (e.g. "23 ianuarie 2026") rather than the numeric dd.mm.yyyy.
+function fmtDateRo(s) {
+  const [y,m,d] = s.split('-');
+  return `${Number(d)} ${MONTHS[Number(m)-1].toLowerCase()} ${y}`;
+}
+
 function fmtMoney(n) {
   return n.toLocaleString('ro-RO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' MDL';
 }
@@ -1666,9 +1688,11 @@ function rangePicker() {
       </div>
       <div class="range-inputs">
         <input type="date" class="range-date-input" value="${state.dateStart}" max="${todayStr()}"
+          onclick="try{this.showPicker()}catch(e){}"
           onchange="setDateRange(this.value, document.getElementById('range-end').value)" >
         <span class="range-sep">→</span>
         <input type="date" id="range-end" class="range-date-input" value="${state.dateEnd}" max="${todayStr()}"
+          onclick="try{this.showPicker()}catch(e){}"
           onchange="setDateRange(document.querySelector('.range-date-input').value, this.value)">
       </div>
     </div>
@@ -2610,7 +2634,7 @@ function renderClienti(container) {
                   </div>
                 </div>
                 <div class="lsc-name" style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:${done ? '#b07878' : 'var(--gold)'};letter-spacing:-.01em;line-height:1.3">${esc(dispName)}</div>
-                <div class="lsc-contract" style="font-size:12px;color:var(--muted);margin-top:2px;margin-bottom:10px;line-height:1.4">${c.notes ? esc(c.notes) : '—'}${c.contract_date ? ` <span style="opacity:.75">· ${fmtDate(c.contract_date)}</span>` : ''}</div>
+                <div class="lsc-contract" style="font-size:12px;color:var(--muted);margin-top:2px;margin-bottom:10px;line-height:1.4">${c.notes ? esc(c.notes) : '—'}${c.contract_date ? ` <span style="opacity:.75">din ${fmtDateRo(c.contract_date)}</span>` : ''}</div>
                 <div class="lsc-row"><span>Intrări</span><span>${cnt}</span></div>
                 <div class="lsc-row"><span>Facturi</span><span>${invCt}</span></div>
                 <div class="lsc-row"><span>Chitanțe</span><span>${rcptCt}</span></div>
