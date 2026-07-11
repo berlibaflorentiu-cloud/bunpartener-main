@@ -407,9 +407,9 @@
     tr:hover td { background: var(--surface2); }
     .td-hours { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--gold); }
 
-    /* flag rows with an open atenție (deadline) so they read at a glance */
-    tr.has-atentie td { background: rgba(200, 169, 110, 0.07); }
-    tr.has-atentie:hover td { background: rgba(200, 169, 110, 0.12); }
+    /* flag rows with an open atenție (deadline) so they read at a glance —
+       just the edge accent, no full-row wash (stacks into a heavy block
+       when several flagged rows sit next to each other) */
     tr.has-atentie td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
     .td-date { color: var(--muted); font-size: 13px; }
     .td-money { font-size: 13px; color: var(--muted); }
@@ -881,11 +881,9 @@
       .entries-table .td-del { position: absolute; top: 4px; right: 2px; width: auto; display: flex; gap: 2px; }
       .entries-table .btn-delete { padding: 11px 13px; font-size: 16px; }
       .entries-table .btn-edit { padding: 11px 9px; }
-      /* the tr is the whole card here, so give it the tint/accent directly
-         instead of per-td (per-td rules from the desktop table layout still
-         apply and would otherwise double up) */
-      .entries-table tr.has-atentie { background: rgba(200, 169, 110, 0.07); box-shadow: inset 3px 0 0 var(--gold); }
-      .entries-table tr.has-atentie td { background: none; box-shadow: none; }
+      /* the tr is the whole card here, so give it the accent directly */
+      .entries-table tr.has-atentie { box-shadow: inset 3px 0 0 var(--gold); }
+      .entries-table tr.has-atentie td { box-shadow: none; }
       /* edit mode on mobile: stack cells as block, un-absolute the action row */
       .entries-table tr[data-editing="1"] td { display: block !important; }
       .entries-table tr[data-editing="1"] .td-date::after { content: none; }
