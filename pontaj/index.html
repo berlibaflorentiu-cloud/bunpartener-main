@@ -2685,21 +2685,18 @@ function _initSiteCharts(dayKeys, byDay, topPages, topRefs) {
   const GOLD_A = 'rgba(200,169,110,0.15)';
   const MUTED  = '#8B949E';
   const GRID   = 'rgba(48,54,61,0.8)';
-  const BASE_OPTS = {
-    responsive: true,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { grid: { color: GRID }, ticks: { color: MUTED, font: { family: 'DM Sans', size: 12 } } },
-      y: { grid: { color: GRID }, ticks: { color: MUTED, font: { family: 'DM Sans', size: 12 } } },
-    },
-  };
+  // Chart.js mutates the scale config objects it's given (adding a resolved
+  // `type`), so each chart needs its own fresh objects — never share/spread
+  // the same nested scale object across multiple Chart instances.
+  const axisStyle = (extra) => ({ grid: { color: GRID }, ticks: { color: MUTED, font: { family: 'DM Sans', size: 12 }, ...extra } });
+  const legendOff = { plugins: { legend: { display: false } } };
 
   const c1 = document.getElementById('chart-site-daily');
   if (c1 && window.Chart) {
     new Chart(c1, {
       type: 'bar',
       data: { labels: dayKeys, datasets: [{ data: dayKeys.map(d => byDay[d]), backgroundColor: GOLD_A, borderColor: GOLD, borderWidth: 1, borderRadius: 4 }] },
-      options: BASE_OPTS,
+      options: { responsive: true, ...legendOff, scales: { x: axisStyle(), y: axisStyle({ precision: 0 }) } },
     });
   }
 
@@ -2711,11 +2708,7 @@ function _initSiteCharts(dayKeys, byDay, topPages, topRefs) {
         labels: topPages.map(([p]) => p.length > 24 ? p.slice(0,24)+'…' : p),
         datasets: [{ data: topPages.map(([,n]) => n), backgroundColor: GOLD_A, borderColor: GOLD, borderWidth: 1, borderRadius: 4 }],
       },
-      options: { indexAxis: 'y', ...BASE_OPTS,
-        scales: {
-          x: { ...BASE_OPTS.scales.x, ticks: { ...BASE_OPTS.scales.x.ticks, precision: 0 }, type: 'linear' },
-          y: { ...BASE_OPTS.scales.y, type: 'category' },
-        } },
+      options: { responsive: true, indexAxis: 'y', ...legendOff, scales: { x: axisStyle({ precision: 0 }), y: axisStyle() } },
     });
   }
 
@@ -2727,11 +2720,7 @@ function _initSiteCharts(dayKeys, byDay, topPages, topRefs) {
         labels: topRefs.map(([r]) => r),
         datasets: [{ data: topRefs.map(([,n]) => n), backgroundColor: GOLD_A, borderColor: GOLD, borderWidth: 1, borderRadius: 4 }],
       },
-      options: { indexAxis: 'y', ...BASE_OPTS,
-        scales: {
-          x: { ...BASE_OPTS.scales.x, ticks: { ...BASE_OPTS.scales.x.ticks, precision: 0 }, type: 'linear' },
-          y: { ...BASE_OPTS.scales.y, type: 'category' },
-        } },
+      options: { responsive: true, indexAxis: 'y', ...legendOff, scales: { x: axisStyle({ precision: 0 }), y: axisStyle() } },
     });
   }
 }
