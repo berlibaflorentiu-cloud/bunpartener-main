@@ -2218,6 +2218,20 @@ async function saveEntryEdit(id) {
   const idx = allEntries.findIndex(x => x.id === id);
   if (idx !== -1) allEntries[idx] = data;
   localStorage.setItem('pontaj_entries_cache', JSON.stringify(allEntries));
+
+  // keep a linked pending atenție's client/description in sync with the entry
+  const linkedAtentie = allAtentii.find(a => a.entry_id === id && a.status === 'pending');
+  if (linkedAtentie && (linkedAtentie.client !== client || linkedAtentie.description !== description)) {
+    const { data: aData, error: aErr } = await db.from('atentii')
+      .update({ client, description })
+      .eq('id', linkedAtentie.id).select().single();
+    if (!aErr && aData) {
+      const aIdx = allAtentii.findIndex(a => a.id === aData.id);
+      if (aIdx !== -1) allAtentii[aIdx] = aData;
+      localStorage.setItem('pontaj_atentii_cache', JSON.stringify(allAtentii));
+    }
+  }
+
   _restoreEntryRow(row, data);
 }
 
