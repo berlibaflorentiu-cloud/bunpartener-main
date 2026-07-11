@@ -1273,22 +1273,26 @@ async function fetchAndShow(userId) {
 
     if (isAdmin(currentUser)) {
       try {
-        const [cRes, iRes, ieRes, rRes, crRes, paRes] = await dbTimeout(Promise.all([
+        const [cRes, iRes, ieRes, rRes, crRes] = await dbTimeout(Promise.all([
           db.from('clients').select('*').order('name'),
           db.from('invoices').select('*').order('created_at', { ascending: false }),
           db.from('invoice_entries').select('*'),
           db.from('receipts').select('*').order('date', { ascending: false }),
           db.from('client_reports').select('*').order('created_at', { ascending: false }),
-          db.from('personal_atentii').select('*').order('deadline_date'),
         ]));
         allClients        = cRes.data  || [];
         allInvoices       = iRes.data  || [];
         allInvoiceEntries = ieRes.data || [];
         allReceipts       = rRes.data  || [];
         allClientReports  = crRes.data || [];
+      } catch(e) { /* tables not yet created — graceful degradation */ }
+      // isolated from the batch above — a failure here must never block
+      // client/invoice data (which the client-name autocomplete depends on)
+      try {
+        const paRes = await dbTimeout(db.from('personal_atentii').select('*').order('deadline_date'));
         allPersonalAtentii = paRes.data || [];
         localStorage.setItem('pontaj_personal_atentii_cache', JSON.stringify(allPersonalAtentii));
-      } catch(e) { /* tables not yet created — graceful degradation */ }
+      } catch(e) { /* table not yet created — graceful degradation */ }
     }
 
     showApp();
@@ -1321,22 +1325,26 @@ async function refreshInBackground(userId) {
 
     if (isAdmin(currentUser)) {
       try {
-        const [cRes, iRes, ieRes, rRes, crRes, paRes] = await Promise.all([
+        const [cRes, iRes, ieRes, rRes, crRes] = await Promise.all([
           db.from('clients').select('*').order('name'),
           db.from('invoices').select('*').order('created_at', { ascending: false }),
           db.from('invoice_entries').select('*'),
           db.from('receipts').select('*').order('date', { ascending: false }),
           db.from('client_reports').select('*').order('created_at', { ascending: false }),
-          db.from('personal_atentii').select('*').order('deadline_date'),
         ]);
         allClients        = cRes.data  || [];
         allInvoices       = iRes.data  || [];
         allInvoiceEntries = ieRes.data || [];
         allReceipts       = rRes.data  || [];
         allClientReports  = crRes.data || [];
+      } catch(e) { /* tables not yet created */ }
+      // isolated from the batch above — a failure here must never block
+      // client/invoice data (which the client-name autocomplete depends on)
+      try {
+        const paRes = await db.from('personal_atentii').select('*').order('deadline_date');
         allPersonalAtentii = paRes.data || [];
         localStorage.setItem('pontaj_personal_atentii_cache', JSON.stringify(allPersonalAtentii));
-      } catch(e) { /* tables not yet created */ }
+      } catch(e) { /* table not yet created */ }
     }
 
     updateRequestsBadge();
