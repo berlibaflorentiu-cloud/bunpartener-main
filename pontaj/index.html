@@ -1095,7 +1095,7 @@ function initDateRange() {
   };
 }
 const _dr = initDateRange();
-const state = { dateStart: _dr.start, dateEnd: _dr.end, filterUser: 'all', viewMode: 'admin', customGroup: [], adminTab: 'pontaj', clientiSearch: '', clientiStatus: 'all', registruSearch: '', pontajPage: 1, registruPage: 1, avocatTab: 'pontaj', activePreset: '30d' };
+const state = { dateStart: _dr.start, dateEnd: _dr.end, filterUser: 'all', viewMode: 'admin', customGroup: [], adminTab: 'pontaj', clientiSearch: '', clientiStatus: 'all', registruSearch: '', pontajPage: 1, registruPage: 1, avocatTab: 'pontaj', activePreset: '30d', siteStatsDays: 30 };
 const PAGE_SIZE = 30;
 function isAdmin(u) { return u?.role === 'admin' || u?.role === 'owner'; }
 
@@ -2240,6 +2240,7 @@ function renderAdmin() {
     clienti:   '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
     facturi:   '<path d="M6 2h9l4 4v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M14 2v5h5"/><line x1="8" y1="12" x2="15" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/>',
     registru:  '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+    site:      '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
   };
   const TABS = [
     { key: 'pontaj',    label: 'Pontaj' },
@@ -2247,6 +2248,7 @@ function renderAdmin() {
     { key: 'clienti',   label: 'Clienți' },
     { key: 'facturi',   label: 'Facturi' },
     { key: 'registru',  label: 'Registru' },
+    { key: 'site',      label: 'Site' },
   ];
   document.getElementById('main-content').innerHTML = `
     <div class="admin-tabs" role="tablist">
@@ -2275,6 +2277,7 @@ function renderAdminTabContent() {
   else if (state.adminTab === 'clienti')   renderClienti(el);
   else if (state.adminTab === 'facturi')   renderFacturi(el);
   else if (state.adminTab === 'registru')  renderRegistru(el);
+  else if (state.adminTab === 'site')      renderSiteStats(el);
 }
 
 function searchClienti(inputEl) {
@@ -2542,6 +2545,193 @@ function _initCharts(months, topClients) {
       options: { indexAxis: 'y', ...BASE_OPTS,
         plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.x.toFixed(1) + ' h' } } },
         scales: { x: { ...BASE_OPTS.scales.x, ticks: { ...BASE_OPTS.scales.x.ticks, callback: v => v + 'h' } }, y: BASE_OPTS.scales.y } },
+    });
+  }
+}
+
+// ── Tab: Site (admin only) — bunpartener.md visitor stats ──
+function setSiteStatsRange(days) {
+  state.siteStatsDays = days;
+  const el = document.getElementById('admin-tab-content');
+  if (el) renderSiteStats(el);
+}
+
+function _siteReferrerLabel(ref) {
+  if (!ref) return 'Direct';
+  try { return new URL(ref).hostname.replace(/^www\./, ''); }
+  catch (e) { return 'Direct'; }
+}
+
+function _siteTopN(rows, key, n) {
+  const counts = {};
+  rows.forEach(r => {
+    const v = r[key] || '(necunoscut)';
+    counts[v] = (counts[v] || 0) + 1;
+  });
+  return Object.entries(counts).sort((a,b) => b[1]-a[1]).slice(0, n);
+}
+
+async function renderSiteStats(container) {
+  const days = state.siteStatsDays;
+  container.innerHTML = `
+    <div class="controls" style="margin-bottom:20px">
+      <div class="range-presets">
+        ${[7,30,90,0].map(n => `<button class="preset-chip${days===n?' active':''}" onclick="setSiteStatsRange(${n})">${n===0?'Tot':'Ultimele '+n+' zile'}</button>`).join('')}
+      </div>
+    </div>
+    <p style="font-size:13px;color:var(--muted)">Se încarcă...</p>
+  `;
+
+  let query = db.from('bunpartener_pageviews')
+    .select('path,lang,referrer,visitor_id,session_id,created_at')
+    .order('created_at', { ascending: false })
+    .limit(20000);
+  if (days > 0) {
+    const since = new Date(Date.now() - days * 86400000).toISOString();
+    query = query.gte('created_at', since);
+  }
+  const { data, error } = await query;
+
+  // bail if the admin navigated away from the tab while this was loading
+  if (state.adminTab !== 'site') return;
+
+  if (error) {
+    container.querySelector('p').textContent = 'Eroare la încărcare: ' + error.message;
+    return;
+  }
+  if (!data || !data.length) {
+    container.querySelector('p').textContent = 'Niciun vizitator înregistrat încă în această perioadă.';
+    return;
+  }
+
+  const totalViews      = data.length;
+  const uniqueVisitors  = new Set(data.map(r => r.visitor_id)).size;
+  const uniqueSessions  = new Set(data.map(r => r.session_id)).size;
+
+  const byDay = {};
+  data.forEach(r => {
+    const d = r.created_at.slice(0, 10);
+    byDay[d] = (byDay[d] || 0) + 1;
+  });
+  const dayKeys = Object.keys(byDay).sort().slice(-14);
+
+  const topPages = _siteTopN(data, 'path', 8);
+  const topRefs  = _siteTopN(data.map(r => ({ refLabel: _siteReferrerLabel(r.referrer) })), 'refLabel', 6);
+  const byLang   = _siteTopN(data, 'lang', 5);
+
+  container.innerHTML = `
+    <div class="controls" style="margin-bottom:20px">
+      <div class="range-presets">
+        ${[7,30,90,0].map(n => `<button class="preset-chip${days===n?' active':''}" onclick="setSiteStatsRange(${n})">${n===0?'Tot':'Ultimele '+n+' zile'}</button>`).join('')}
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Vizualizări</div>
+        <div class="stat-value">${totalViews.toLocaleString('ro-RO')}</div>
+        <div class="stat-sub">pagini bunpartener.md</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Vizitatori unici</div>
+        <div class="stat-value">${uniqueVisitors.toLocaleString('ro-RO')}</div>
+        <div class="stat-sub">după dispozitiv/browser</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Vizite (sesiuni)</div>
+        <div class="stat-value">${uniqueSessions.toLocaleString('ro-RO')}</div>
+        <div class="stat-sub">${(totalViews/Math.max(1,uniqueSessions)).toFixed(1)} pagini / vizită</div>
+      </div>
+    </div>
+
+    <div class="dash-charts">
+      <div class="dash-chart-card">
+        <div class="dash-chart-title">Vizualizări pe zi</div>
+        <canvas id="chart-site-daily" height="200"></canvas>
+      </div>
+      <div class="dash-chart-card">
+        <div class="dash-chart-title">Pagini vizitate</div>
+        <canvas id="chart-site-pages" height="200"></canvas>
+      </div>
+    </div>
+
+    <div class="dash-charts" style="margin-top:20px">
+      <div class="dash-chart-card">
+        <div class="dash-chart-title">De unde vin vizitatorii</div>
+        <canvas id="chart-site-refs" height="200"></canvas>
+      </div>
+      <div class="dash-chart-card">
+        <div class="dash-chart-title">Limbă</div>
+        <table style="width:100%;font-size:13px;border-collapse:collapse">
+          <thead>
+            <tr style="color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:.08em">
+              <th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--border)">Limbă</th>
+              <th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--border)">Vizualizări</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${byLang.map(([lang, n]) => `<tr><td style="padding:8px 0;border-bottom:1px solid var(--border)">${esc(lang.toUpperCase())}</td><td style="text-align:right;padding:8px 0;border-bottom:1px solid var(--border);color:var(--gold)">${n}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  requestAnimationFrame(() => _initSiteCharts(dayKeys, byDay, topPages, topRefs));
+}
+
+function _initSiteCharts(dayKeys, byDay, topPages, topRefs) {
+  const GOLD   = '#C8A96E';
+  const GOLD_A = 'rgba(200,169,110,0.15)';
+  const MUTED  = '#8B949E';
+  const GRID   = 'rgba(48,54,61,0.8)';
+  const BASE_OPTS = {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: GRID }, ticks: { color: MUTED, font: { family: 'DM Sans', size: 12 } } },
+      y: { grid: { color: GRID }, ticks: { color: MUTED, font: { family: 'DM Sans', size: 12 } } },
+    },
+  };
+
+  const c1 = document.getElementById('chart-site-daily');
+  if (c1 && window.Chart) {
+    new Chart(c1, {
+      type: 'bar',
+      data: { labels: dayKeys, datasets: [{ data: dayKeys.map(d => byDay[d]), backgroundColor: GOLD_A, borderColor: GOLD, borderWidth: 1, borderRadius: 4 }] },
+      options: BASE_OPTS,
+    });
+  }
+
+  const c2 = document.getElementById('chart-site-pages');
+  if (c2 && window.Chart) {
+    new Chart(c2, {
+      type: 'bar',
+      data: {
+        labels: topPages.map(([p]) => p.length > 24 ? p.slice(0,24)+'…' : p),
+        datasets: [{ data: topPages.map(([,n]) => n), backgroundColor: GOLD_A, borderColor: GOLD, borderWidth: 1, borderRadius: 4 }],
+      },
+      options: { indexAxis: 'y', ...BASE_OPTS,
+        scales: {
+          x: { ...BASE_OPTS.scales.x, ticks: { ...BASE_OPTS.scales.x.ticks, precision: 0 }, type: 'linear' },
+          y: { ...BASE_OPTS.scales.y, type: 'category' },
+        } },
+    });
+  }
+
+  const c3 = document.getElementById('chart-site-refs');
+  if (c3 && window.Chart) {
+    new Chart(c3, {
+      type: 'bar',
+      data: {
+        labels: topRefs.map(([r]) => r),
+        datasets: [{ data: topRefs.map(([,n]) => n), backgroundColor: GOLD_A, borderColor: GOLD, borderWidth: 1, borderRadius: 4 }],
+      },
+      options: { indexAxis: 'y', ...BASE_OPTS,
+        scales: {
+          x: { ...BASE_OPTS.scales.x, ticks: { ...BASE_OPTS.scales.x.ticks, precision: 0 }, type: 'linear' },
+          y: { ...BASE_OPTS.scales.y, type: 'category' },
+        } },
     });
   }
 }
