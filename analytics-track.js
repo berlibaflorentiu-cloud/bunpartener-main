@@ -3,6 +3,12 @@
    id used to distinguish visits and visitors, written to our own Supabase table. */
 (function () {
   try {
+    // Skip logging for automated/headless browsers so dev/QA checks never pollute
+    // real visitor stats. navigator.webdriver catches Selenium/Puppeteer/Playwright;
+    // the UA check catches Electron-based automation tools that don't set it.
+    if (navigator.webdriver) return;
+    if (/Claude\/|Electron\//.test(navigator.userAgent)) return;
+
     var SUPA_URL = 'https://beuseulqtgtesavswxyy.supabase.co';
     var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJldXNldWxxdGd0ZXNhdnN3eHl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNzM0MzYsImV4cCI6MjA5NzY0OTQzNn0.IV-pknNPnOyeRgZDi5sV413HHrPbqbtdPY_sxQ-HORc';
 
