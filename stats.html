@@ -17,11 +17,28 @@
     --white:#ffffff;--off:#f2f5fb;--muted:#566280;--light:#8a9bbf;
     --blue:#1d4ed8;--blue-light:#3b6ef6;--blue-pale:rgba(29,78,216,.09);--blue-border:rgba(29,78,216,.18);
     --acc-border:rgba(255,255,255,.18);
+    --md-yellow:#ffd200;--md-red:#ce1126;--gold:#c9a876;--gold-dim:rgba(201,168,118,.4);
     --ff-serif:'Cormorant Garamond',Georgia,serif;--ff-sans:'DM Sans',system-ui,sans-serif;
   }
   body{
     background:var(--navy);color:var(--off);font-family:var(--ff-sans);
     min-height:100vh;font-size:15px;line-height:1.55;
+    padding-top:4px;
+  }
+  /* hairline ribbon in the Moldovan flag order — reads as an official document border */
+  .md-ribbon{
+    position:fixed;top:0;left:0;right:0;height:4px;z-index:500;
+    background:linear-gradient(90deg,var(--blue) 0 33.3%,var(--md-yellow) 33.3% 66.6%,var(--md-red) 66.6% 100%);
+  }
+  /* diagonal hatch divider, echoing traditional covor trim — replaces plain borders between sections */
+  .md-hatch{
+    height:6px;width:100%;opacity:.4;
+    background:repeating-linear-gradient(135deg,var(--gold) 0 2px,transparent 2px 9px);
+  }
+  .md-crest{color:var(--gold);display:block;}
+  .md-crest-watermark{
+    position:absolute;right:-40px;top:-60px;width:420px;height:420px;opacity:.04;
+    pointer-events:none;color:var(--gold);z-index:0;
   }
   h1,h2,h3{font-family:var(--ff-serif);font-weight:600;color:var(--white);}
   .wrap{max-width:1100px;margin:0 auto;padding:0 24px;}
@@ -32,6 +49,8 @@
     width:100%;max-width:380px;border:1px solid var(--acc-border);background:var(--navy-2);
     padding:36px 32px;border-radius:6px;
   }
+  .auth-card{position:relative;text-align:center;}
+  .auth-card .md-crest{width:40px;height:40px;margin:0 auto 14px;}
   .auth-card .wordmark{
     display:block;text-align:center;margin-bottom:4px;font-family:var(--ff-serif);
     font-weight:700;font-size:2rem;color:var(--white);
@@ -61,10 +80,12 @@
   #app-shell.ready{display:block;}
 
   header{
-    border-bottom:1px solid var(--acc-border);padding:22px 0;
+    padding:22px 0;
     display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
   }
   .wordmark{font-family:var(--ff-serif);font-weight:700;font-size:1.35rem;color:var(--white);}
+  .head-title{display:flex;align-items:center;gap:12px;}
+  .head-title .md-crest{width:26px;height:26px;flex-shrink:0;}
   .head-actions{display:flex;align-items:center;gap:14px;}
   .user-email{font-size:.76rem;color:var(--light);}
   .logout-btn{
@@ -74,7 +95,7 @@
   }
   .logout-btn:hover{color:var(--white);border-color:var(--blue-light);}
 
-  main{padding:40px 0 80px;}
+  main{padding:40px 0 80px;position:relative;overflow:hidden;}
   .range-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:32px;}
   .range-tabs{display:flex;gap:8px;}
   .range-tab{
@@ -85,14 +106,28 @@
   .range-tab:hover:not(.active){border-color:var(--blue-light);color:var(--white);}
   .refresh-note{font-size:.76rem;color:var(--light);}
 
-  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:36px;}
-  .stat-card{background:var(--navy-2);border:1px solid var(--acc-border);border-radius:8px;padding:22px 24px;}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:36px;position:relative;z-index:1;}
+  .stat-card{
+    background:var(--navy-2);border:1px solid var(--acc-border);border-radius:8px;padding:22px 24px;
+    position:relative;overflow:hidden;
+  }
+  .stat-card::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,var(--blue) 0 33.3%,var(--md-yellow) 33.3% 66.6%,var(--md-red) 66.6% 100%);
+  }
   .stat-num{font-family:var(--ff-serif);font-size:2.2rem;font-weight:700;color:var(--white);line-height:1;}
   .stat-label{font-size:.76rem;letter-spacing:.06em;text-transform:uppercase;color:var(--light);margin-top:8px;}
 
   .panels{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;margin-bottom:20px;}
   @media(max-width:800px){.panels{grid-template-columns:1fr;}}
-  .panel{background:var(--navy-2);border:1px solid var(--acc-border);border-radius:8px;padding:24px;}
+  .panel{
+    background:var(--navy-2);border:1px solid var(--acc-border);border-radius:8px;padding:24px;
+    position:relative;z-index:1;
+  }
+  .panel::before{
+    content:'';position:absolute;top:0;left:24px;right:24px;height:1px;
+    background:linear-gradient(90deg,transparent,var(--gold-dim) 50%,transparent);
+  }
   .panel h2{font-size:1.15rem;margin-bottom:18px;}
 
   .bar-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
@@ -111,8 +146,26 @@
 </head>
 <body>
 
+<div class="md-ribbon" aria-hidden="true"></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="md-aurochs" viewBox="0 0 100 100">
+      <!-- capul de bour — stylized aurochs head, Moldova's heraldic mark -->
+      <path d="M50,34 C38,30 24,32 13,16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      <path d="M50,34 C62,30 76,32 87,16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      <path d="M50,14 L52,20 L58,22 L52,24 L50,30 L48,24 L42,22 L48,20 Z" fill="currentColor"/>
+      <path d="M50,34 C40,36 34,46 34,58 C34,72 40,84 50,90 C60,84 66,72 66,58 C66,46 60,36 50,34 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="43" cy="52" r="2.2" fill="currentColor"/>
+      <circle cx="57" cy="52" r="2.2" fill="currentColor"/>
+      <path d="M44,76 Q50,80 56,76" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+    </symbol>
+  </defs>
+</svg>
+
 <div id="auth-screen">
   <div class="auth-card" id="login-card">
+    <svg class="md-crest"><use href="#md-aurochs"/></svg>
     <span class="wordmark">BU</span>
     <p class="auth-sub">Statistici Vizitatori — Autentificare</p>
     <div class="auth-field">
@@ -131,14 +184,20 @@
 <div id="app-shell">
   <div class="wrap">
     <header>
-      <span class="wordmark">BuNPartener — Statistici</span>
+      <div class="head-title">
+        <svg class="md-crest"><use href="#md-aurochs"/></svg>
+        <span class="wordmark">BuNPartener — Statistici</span>
+      </div>
       <div class="head-actions">
         <span class="user-email" id="user-email"></span>
         <button class="logout-btn" id="logout-btn">Ieșire</button>
       </div>
     </header>
-
+  </div>
+  <div class="md-hatch" aria-hidden="true"></div>
+  <div class="wrap">
     <main>
+      <svg class="md-crest-watermark" aria-hidden="true"><use href="#md-aurochs"/></svg>
       <div class="range-row">
         <div class="range-tabs">
           <button class="range-tab" data-days="7">7 zile</button>
