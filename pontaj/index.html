@@ -406,6 +406,11 @@
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: var(--surface2); }
     .td-hours { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--gold); }
+
+    /* flag rows with an open atenție (deadline) so they read at a glance */
+    tr.has-atentie td { background: rgba(200, 169, 110, 0.07); }
+    tr.has-atentie:hover td { background: rgba(200, 169, 110, 0.12); }
+    tr.has-atentie td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
     .td-date { color: var(--muted); font-size: 13px; }
     .td-money { font-size: 13px; color: var(--muted); }
     .td-del { white-space: nowrap; }
@@ -876,6 +881,11 @@
       .entries-table .td-del { position: absolute; top: 4px; right: 2px; width: auto; display: flex; gap: 2px; }
       .entries-table .btn-delete { padding: 11px 13px; font-size: 16px; }
       .entries-table .btn-edit { padding: 11px 9px; }
+      /* the tr is the whole card here, so give it the tint/accent directly
+         instead of per-td (per-td rules from the desktop table layout still
+         apply and would otherwise double up) */
+      .entries-table tr.has-atentie { background: rgba(200, 169, 110, 0.07); box-shadow: inset 3px 0 0 var(--gold); }
+      .entries-table tr.has-atentie td { background: none; box-shadow: none; }
       /* edit mode on mobile: stack cells as block, un-absolute the action row */
       .entries-table tr[data-editing="1"] td { display: block !important; }
       .entries-table tr[data-editing="1"] .td-date::after { content: none; }
@@ -1887,7 +1897,7 @@ function renderAvocatPontaj(container, user) {
             </tr></thead>
             <tbody>
               ${entries.map(e => `
-                <tr data-entry-id="${e.id}">
+                <tr data-entry-id="${e.id}" class="${hasAtentie(e.id) ? 'has-atentie' : ''}">
                   <td class="td-date" data-label="Data">${fmtDate(e.date)}</td>
                   <td class="td-client" data-label="Client / Dosar" style="color:var(--muted);font-size:13px">${esc(e.client) || '—'}</td>
                   <td class="td-desc" data-label="Descriere">${esc(e.description)}</td>
@@ -1959,7 +1969,7 @@ function renderAvocatCheltuieli(container, user) {
             </tr></thead>
             <tbody>
               ${entries.map(e => `
-                <tr data-entry-id="${e.id}">
+                <tr data-entry-id="${e.id}" class="${hasAtentie(e.id) ? 'has-atentie' : ''}">
                   <td class="td-date" data-label="Data">${fmtDate(e.date)}</td>
                   <td class="td-client" data-label="Client / Dosar" style="color:var(--muted);font-size:13px">${esc(e.client) || '—'}</td>
                   <td class="td-desc" data-label="Descriere">${esc(e.description)}</td>
@@ -2438,7 +2448,7 @@ function renderAdminPontaj(container) {
                 const val = e.fixed_price != null ? fmtMoney(e.fixed_price) : Number(e.hours).toFixed(1) + 'h';
                 const billedBadge = billedIds.has(e.id) ? '<span class="badge-billed">facturat</span>' : '';
                 return `
-                  <tr data-entry-id="${e.id}">
+                  <tr data-entry-id="${e.id}" class="${hasAtentie(e.id) ? 'has-atentie' : ''}">
                     <td class="td-date" data-label="Data">${fmtDate(e.date)}</td>
                     <td class="td-avocat" data-label="Avocat" style="font-weight:500;font-size:13px">${u?.name || '—'}</td>
                     <td class="td-client" data-label="Client / Dosar" style="color:var(--muted);font-size:13px">${esc(e.client) || '—'}</td>
@@ -2763,6 +2773,10 @@ function _initSiteCharts(dayKeys, byDay, topPages, topRefs) {
 // ── Tab: Atenție — deadline tracker (shared by admin + avocat) ──
 // Everyone sees every deadline firm-wide; anyone can create one from a
 // timesheet entry (new or already logged) and mark it resolved.
+
+function hasAtentie(entryId) {
+  return allAtentii.some(a => a.entry_id === entryId && a.status === 'pending');
+}
 
 function atentieButtonHtml(entryId) {
   const existing = allAtentii.find(a => a.entry_id === entryId && a.status === 'pending');
