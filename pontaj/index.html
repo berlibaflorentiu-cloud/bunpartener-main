@@ -2782,7 +2782,8 @@ function hasAtentie(entryId) {
 function atentieButtonHtml(entryId) {
   const existing = allAtentii.find(a => a.entry_id === entryId && a.status === 'pending');
   const style = existing ? 'color:var(--gold);border-color:rgba(200,169,110,0.35);background:rgba(200,169,110,0.08)' : '';
-  return `<button class="btn-edit" style="${style}" onclick="openAtentieModal('${entryId}')" aria-label="Atenție" title="${existing ? 'Atenție setată — click pentru a edita' : 'Creați atenție'}"><svg width="13" height="13" viewBox="0 0 24 24" fill="${existing?'currentColor':'none'}" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>`;
+  const dot = existing ? '<circle cx="12" cy="10" r="2.3" fill="var(--red)" stroke="none"/>' : '';
+  return `<button class="btn-edit" style="${style}" onclick="openAtentieModal('${entryId}')" aria-label="Atenție" title="${existing ? 'Atenție setată — click pentru a edita' : 'Creați atenție'}"><svg width="13" height="13" viewBox="0 0 24 24" fill="${existing?'currentColor':'none'}" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>${dot}</svg></button>`;
 }
 
 function atentieFormFieldsHtml(prefix) {
