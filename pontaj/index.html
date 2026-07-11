@@ -745,6 +745,14 @@
     /* The app's dashboard tables highlight hovered rows with a dark fill —
        wrong for this document, which is styled light/print-like. */
     #act-document tr:hover td { background: none; }
+    #act-document .act-services-table { table-layout: fixed; }
+    #act-document .act-lawyer-cell {
+      white-space: nowrap;
+      word-break: keep-all;
+      overflow-wrap: normal;
+      font-size: 9pt;
+      line-height: 1.15;
+    }
 
     /* ── ADMIN TABS ── */
     .admin-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:24px; overflow-x:auto; scrollbar-width:none; }
@@ -1506,6 +1514,9 @@ function sumH(arr) { return arr.reduce((s, e) => s + Number(e.hours), 0); }
 
 function esc(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function escNoBreak(s) {
+  return esc(s).replace(/\s+/g, '&nbsp;');
 }
 
 // ═══════════════════════════════════════
@@ -4631,16 +4642,25 @@ async function generateAct() {
 
       <p style="margin-bottom:10px;"><strong>1. EXECUTORUL</strong> a acordat, în perioada de referință, servicii de consultanță și asistență juridică CLIENTULUI, după cum urmează:</p>
 
-      <table style="width:100%; border-collapse:collapse; font-size:10pt; margin-bottom:18px;">
+      <table class="act-services-table" style="width:100%; border-collapse:collapse; table-layout:fixed; font-size:10pt; margin-bottom:18px;">
+        <colgroup>
+          <col style="width:5%;">
+          <col style="width:22%;">
+          <col style="width:20%;">
+          <col style="width:11%;">
+          <col style="width:11%;">
+          <col style="width:17%;">
+          <col style="width:14%;">
+        </colgroup>
         <thead>
           <tr style="background:#f0f0f0;">
-            <th style="border:1px solid #000;padding:5px 6px;text-align:center;width:30px;">Nr.</th>
+            <th style="border:1px solid #000;padding:5px 6px;text-align:center;">Nr.</th>
             <th style="border:1px solid #000;padding:5px 6px;text-align:left;">Activitatea realizată</th>
-            <th style="border:1px solid #000;padding:5px 6px;text-align:center;width:110px;">Avocatul</th>
-            <th style="border:1px solid #000;padding:5px 6px;text-align:center;width:70px;">Nr. ore</th>
-            <th style="border:1px solid #000;padding:5px 6px;text-align:center;width:70px;">Tarif EUR/h</th>
-            <th style="border:1px solid #000;padding:5px 6px;text-align:center;width:90px;">Suma onorariului</th>
-            <th style="border:1px solid #000;padding:5px 6px;text-align:center;width:80px;">Cheltuieli</th>
+            <th style="border:1px solid #000;padding:5px 6px;text-align:center;">Avocatul</th>
+            <th style="border:1px solid #000;padding:5px 6px;text-align:center;">Nr. ore</th>
+            <th style="border:1px solid #000;padding:5px 6px;text-align:center;">Tarif EUR/h</th>
+            <th style="border:1px solid #000;padding:5px 6px;text-align:center;">Suma onorariului</th>
+            <th style="border:1px solid #000;padding:5px 6px;text-align:center;">Cheltuieli</th>
           </tr>
         </thead>
         <tbody>
@@ -4673,7 +4693,7 @@ async function generateAct() {
               <tr>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${i + 1}.</td>
                 <td style="border:1px solid #000;padding:5px 6px;">${esc(e.description)}${e.client ? ' <em>(' + esc(e.client) + ')</em>' : ''}</td>
-                <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${u?.name || '—'}</td>
+                <td class="act-lawyer-cell" style="border:1px solid #000;padding:5px 4px;text-align:center;white-space:nowrap;word-break:keep-all;overflow-wrap:normal;font-size:9pt;line-height:1.15;">${u?.name ? escNoBreak(u.name) : '—'}</td>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${hoursDisplay}</td>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${rateDisplay}</td>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${sumaDisplay}</td>
@@ -4846,8 +4866,10 @@ async function downloadDocx() {
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body { font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5; margin: 0; }
     table { border-collapse: collapse; width: 100%; }
+    .act-services-table { table-layout: fixed; }
     td, th { border: 1px solid #000; padding: 4px 6px; font-size: 10pt; }
     th { text-align: center; font-size: 9pt; text-transform: uppercase; }
+    .act-lawyer-cell { white-space: nowrap; word-break: keep-all; font-size: 9pt; line-height: 1.15; }
   </style></head><body>${clone.outerHTML}</body></html>`;
 
   const docBlob = new Blob(['﻿', html], { type: 'application/msword' });
