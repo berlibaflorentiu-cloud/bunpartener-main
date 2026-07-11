@@ -2456,7 +2456,7 @@ function renderAdminPontaj(container) {
         : `<table class="entries-table">
             <thead><tr>
               <th style="width:100px">Data</th>
-              <th>Avocat</th>
+              <th style="width:130px;min-width:130px">Avocat</th>
               <th>Client / Dosar</th>
               <th>Descriere</th>
               <th style="width:110px">Ore / Valoare</th>
@@ -2470,7 +2470,7 @@ function renderAdminPontaj(container) {
                 return `
                   <tr data-entry-id="${e.id}">
                     <td class="td-date" data-label="Data">${hasAtentie(e.id) ? '<span class="atentie-dot" title="Are atenție activă" aria-hidden="true"></span>' : ''}${fmtDate(e.date)}</td>
-                    <td class="td-avocat" data-label="Avocat" style="font-weight:500;font-size:13px">${u?.name || '—'}</td>
+                    <td class="td-avocat" data-label="Avocat" style="font-weight:500;font-size:13px;min-width:130px">${u?.name || '—'}</td>
                     <td class="td-client" data-label="Client / Dosar" style="color:var(--muted);font-size:13px">${esc(e.client) || '—'}</td>
                     <td class="td-desc" data-label="Descriere" style="font-size:14px">${esc(e.description)}</td>
                     <td class="td-hours" data-label="Ore / Valoare">${val}${billedBadge}</td>
