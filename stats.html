@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Statistici Vizitatori | BuNPartener (Internal)</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="favicon.png?v=2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{
+    --navy:#0d1b35;--navy-2:#142240;--navy-3:#1c3060;
+    --white:#ffffff;--off:#f2f5fb;--muted:#566280;--light:#8a9bbf;
+    --blue:#1d4ed8;--blue-light:#3b6ef6;--blue-pale:rgba(29,78,216,.09);--blue-border:rgba(29,78,216,.18);
+    --acc-border:rgba(255,255,255,.18);
+    --ff-serif:'Cormorant Garamond',Georgia,serif;--ff-sans:'DM Sans',system-ui,sans-serif;
+  }
+  body{
+    background:var(--navy);color:var(--off);font-family:var(--ff-sans);
+    min-height:100vh;font-size:15px;line-height:1.55;
+  }
+  h1,h2,h3{font-family:var(--ff-serif);font-weight:600;color:var(--white);}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 24px;}
+
+  /* ── auth screen ── */
+  #auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .auth-card{
+    width:100%;max-width:380px;border:1px solid var(--acc-border);background:var(--navy-2);
+    padding:36px 32px;border-radius:6px;
+  }
+  .auth-card .wordmark{
+    display:block;text-align:center;margin-bottom:4px;font-family:var(--ff-serif);
+    font-weight:700;font-size:2rem;color:var(--white);
+  }
+  .auth-sub{
+    text-align:center;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--light);margin-bottom:28px;
+  }
+  .auth-field{margin-bottom:16px;}
+  .auth-field label{display:block;font-size:.76rem;letter-spacing:.04em;color:var(--light);margin-bottom:6px;}
+  .auth-field input{
+    width:100%;background:var(--navy);border:1px solid var(--acc-border);color:var(--off);
+    padding:11px 12px;font-size:.9rem;border-radius:4px;font-family:var(--ff-sans);
+  }
+  .auth-field input:focus{outline:none;border-color:var(--blue-light);}
+  .auth-submit{
+    width:100%;margin-top:6px;padding:12px;border:none;border-radius:4px;cursor:pointer;
+    background:var(--blue);color:var(--white);font-weight:600;font-size:.88rem;transition:background .2s;
+  }
+  .auth-submit:hover{background:var(--blue-light);}
+  .auth-submit:disabled{opacity:.6;cursor:default;}
+  .auth-msg{margin-top:14px;font-size:.82rem;text-align:center;min-height:1.2em;}
+  .auth-msg.error{color:#e38c86;}
+  .auth-msg.success{color:#7fd9a0;}
+
+  #app-shell{display:none;}
+  #app-shell.ready{display:block;}
+
+  header{
+    border-bottom:1px solid var(--acc-border);padding:22px 0;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  }
+  .wordmark{font-family:var(--ff-serif);font-weight:700;font-size:1.35rem;color:var(--white);}
+  .head-actions{display:flex;align-items:center;gap:14px;}
+  .user-email{font-size:.76rem;color:var(--light);}
+  .logout-btn{
+    background:none;border:1px solid var(--acc-border);color:var(--light);
+    padding:8px 14px;border-radius:4px;font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;
+    cursor:pointer;transition:.2s;
+  }
+  .logout-btn:hover{color:var(--white);border-color:var(--blue-light);}
+
+  main{padding:40px 0 80px;}
+  .range-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:32px;}
+  .range-tabs{display:flex;gap:8px;}
+  .range-tab{
+    background:none;border:1px solid var(--acc-border);color:var(--light);
+    padding:8px 16px;border-radius:20px;font-size:.78rem;cursor:pointer;transition:.2s;
+  }
+  .range-tab.active{background:var(--blue);border-color:var(--blue);color:var(--white);}
+  .range-tab:hover:not(.active){border-color:var(--blue-light);color:var(--white);}
+  .refresh-note{font-size:.76rem;color:var(--light);}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:36px;}
+  .stat-card{background:var(--navy-2);border:1px solid var(--acc-border);border-radius:8px;padding:22px 24px;}
+  .stat-num{font-family:var(--ff-serif);font-size:2.2rem;font-weight:700;color:var(--white);line-height:1;}
+  .stat-label{font-size:.76rem;letter-spacing:.06em;text-transform:uppercase;color:var(--light);margin-top:8px;}
+
+  .panels{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;margin-bottom:20px;}
+  @media(max-width:800px){.panels{grid-template-columns:1fr;}}
+  .panel{background:var(--navy-2);border:1px solid var(--acc-border);border-radius:8px;padding:24px;}
+  .panel h2{font-size:1.15rem;margin-bottom:18px;}
+
+  .bar-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+  .bar-label{flex:0 0 130px;font-size:.8rem;color:var(--off);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .bar-track{flex:1;height:8px;background:var(--navy);border-radius:4px;overflow:hidden;}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--blue-light));border-radius:4px;}
+  .bar-val{flex:0 0 42px;text-align:right;font-size:.78rem;color:var(--light);}
+
+  table{width:100%;border-collapse:collapse;font-size:.84rem;}
+  th{text-align:left;color:var(--light);font-weight:500;font-size:.72rem;letter-spacing:.05em;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--acc-border);}
+  td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.06);color:var(--off);}
+  tr:last-child td{border-bottom:none;}
+  .empty-msg{color:var(--light);font-size:.85rem;padding:20px 0;text-align:center;}
+  .loading-msg{color:var(--light);font-size:.85rem;padding:40px 0;text-align:center;}
+</style>
+</head>
+<body>
+
+<div id="auth-screen">
+  <div class="auth-card" id="login-card">
+    <span class="wordmark">BU</span>
+    <p class="auth-sub">Statistici Vizitatori — Autentificare</p>
+    <div class="auth-field">
+      <label for="auth-email">Email</label>
+      <input type="email" id="auth-email" autocomplete="email">
+    </div>
+    <div class="auth-field">
+      <label for="auth-password">Parolă</label>
+      <input type="password" id="auth-password" autocomplete="current-password">
+    </div>
+    <button class="auth-submit" id="auth-login-btn">Autentificare</button>
+    <p class="auth-msg" id="auth-msg"></p>
+  </div>
+</div>
+
+<div id="app-shell">
+  <div class="wrap">
+    <header>
+      <span class="wordmark">BuNPartener — Statistici</span>
+      <div class="head-actions">
+        <span class="user-email" id="user-email"></span>
+        <button class="logout-btn" id="logout-btn">Ieșire</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="range-row">
+        <div class="range-tabs">
+          <button class="range-tab" data-days="7">7 zile</button>
+          <button class="range-tab active" data-days="30">30 zile</button>
+          <button class="range-tab" data-days="90">90 zile</button>
+          <button class="range-tab" data-days="0">Tot</button>
+        </div>
+        <span class="refresh-note" id="refresh-note"></span>
+      </div>
+
+      <div id="content">
+        <p class="loading-msg">Se încarcă...</p>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+  const SUPA_URL = 'https://beuseulqtgtesavswxyy.supabase.co';
+  const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJldXNldWxxdGd0ZXNhdnN3eHl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNzM0MzYsImV4cCI6MjA5NzY0OTQzNn0.IV-pknNPnOyeRgZDi5sV413HHrPbqbtdPY_sxQ-HORc';
+  const db = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+
+  const authScreen = document.getElementById('auth-screen');
+  const appShell = document.getElementById('app-shell');
+
+  function showApp(user){
+    authScreen.style.display = 'none';
+    appShell.classList.add('ready');
+    document.getElementById('user-email').textContent = user.email;
+    loadStats(currentDays);
+  }
+  function showAuth(){
+    appShell.classList.remove('ready');
+    authScreen.style.display = 'flex';
+  }
+
+  document.getElementById('auth-login-btn').addEventListener('click', async () => {
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const msg = document.getElementById('auth-msg');
+    msg.className = 'auth-msg';
+    msg.textContent = '';
+    if (!email || !password){ msg.className = 'auth-msg error'; msg.textContent = 'Introduceți email și parolă.'; return; }
+    const btn = document.getElementById('auth-login-btn');
+    btn.disabled = true; btn.textContent = 'Se conectează…';
+    const { error } = await db.auth.signInWithPassword({ email, password });
+    btn.disabled = false; btn.textContent = 'Autentificare';
+    if (error){
+      msg.className = 'auth-msg error';
+      msg.textContent = error.message === 'Invalid login credentials' ? 'Email sau parolă incorectă.' : error.message;
+    }
+  });
+  document.getElementById('auth-password').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('auth-login-btn').click();
+  });
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await db.auth.signOut();
+  });
+
+  db.auth.onAuthStateChange((event, session) => {
+    if (session && session.user) showApp(session.user);
+    else showAuth();
+  });
+
+  /* ── stats ── */
+  let currentDays = 30;
+
+  document.querySelectorAll('.range-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.range-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentDays = parseInt(btn.dataset.days, 10);
+      loadStats(currentDays);
+    });
+  });
+
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function topN(rows, key, n){
+    const counts = {};
+    rows.forEach(r => {
+      const v = r[key] || '(necunoscut)';
+      counts[v] = (counts[v] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a,b) => b[1]-a[1]).slice(0, n);
+  }
+
+  function referrerLabel(ref){
+    if (!ref) return 'Direct';
+    try {
+      const u = new URL(ref);
+      return u.hostname.replace(/^www\./, '');
+    } catch(e){ return 'Direct'; }
+  }
+
+  async function loadStats(days){
+    const content = document.getElementById('content');
+    content.innerHTML = '<p class="loading-msg">Se încarcă...</p>';
+
+    let query = db.from('bunpartener_pageviews').select('path,lang,referrer,visitor_id,session_id,created_at').order('created_at', { ascending: false }).limit(20000);
+    if (days > 0){
+      const since = new Date(Date.now() - days * 86400000).toISOString();
+      query = query.gte('created_at', since);
+    }
+    const { data, error } = await query;
+
+    if (error){
+      content.innerHTML = '<p class="empty-msg">Eroare la încărcare: ' + escapeHtml(error.message) + '</p>';
+      return;
+    }
+    if (!data || !data.length){
+      content.innerHTML = '<p class="empty-msg">Niciun vizitator înregistrat încă în această perioadă.</p>';
+      return;
+    }
+
+    const totalViews = data.length;
+    const uniqueVisitors = new Set(data.map(r => r.visitor_id)).size;
+    const uniqueSessions = new Set(data.map(r => r.session_id)).size;
+
+    // views per day
+    const byDay = {};
+    data.forEach(r => {
+      const d = r.created_at.slice(0, 10);
+      byDay[d] = (byDay[d] || 0) + 1;
+    });
+    const dayKeys = Object.keys(byDay).sort().slice(-14);
+    const maxDay = Math.max(1, ...dayKeys.map(d => byDay[d]));
+
+    const topPages = topN(data, 'path', 8);
+    const maxPage = Math.max(1, ...topPages.map(p => p[1]));
+
+    const topRefsRaw = data.map(r => ({ ...r, refLabel: referrerLabel(r.referrer) }));
+    const topRefs = topN(topRefsRaw, 'refLabel', 6);
+    const maxRef = Math.max(1, ...topRefs.map(r => r[1]));
+
+    const byLang = topN(data, 'lang', 5);
+
+    content.innerHTML = `
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-num">${totalViews.toLocaleString('ro-RO')}</div><div class="stat-label">Vizualizări</div></div>
+        <div class="stat-card"><div class="stat-num">${uniqueVisitors.toLocaleString('ro-RO')}</div><div class="stat-label">Vizitatori unici</div></div>
+        <div class="stat-card"><div class="stat-num">${uniqueSessions.toLocaleString('ro-RO')}</div><div class="stat-label">Vizite (sesiuni)</div></div>
+        <div class="stat-card"><div class="stat-num">${(totalViews/Math.max(1,uniqueSessions)).toFixed(1)}</div><div class="stat-label">Pagini / vizită</div></div>
+      </div>
+
+      <div class="panel" style="margin-bottom:20px;">
+        <h2>Vizualizări pe zi (ultimele ${dayKeys.length} zile cu date)</h2>
+        ${dayKeys.map(d => `
+          <div class="bar-row">
+            <span class="bar-label">${d}</span>
+            <div class="bar-track"><div class="bar-fill" style="width:${(byDay[d]/maxDay*100).toFixed(1)}%"></div></div>
+            <span class="bar-val">${byDay[d]}</span>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="panels">
+        <div class="panel">
+          <h2>Pagini vizitate</h2>
+          ${topPages.map(([path, n]) => `
+            <div class="bar-row">
+              <span class="bar-label" title="${escapeHtml(path)}">${escapeHtml(path)}</span>
+              <div class="bar-track"><div class="bar-fill" style="width:${(n/maxPage*100).toFixed(1)}%"></div></div>
+              <span class="bar-val">${n}</span>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="panel">
+          <h2>Limbă</h2>
+          <table>
+            <thead><tr><th>Limbă</th><th style="text-align:right;">Vizualizări</th></tr></thead>
+            <tbody>
+              ${byLang.map(([lang, n]) => `<tr><td>${escapeHtml(lang.toUpperCase())}</td><td style="text-align:right;">${n}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>De unde vin vizitatorii</h2>
+        ${topRefs.map(([ref, n]) => `
+          <div class="bar-row">
+            <span class="bar-label" title="${escapeHtml(ref)}">${escapeHtml(ref)}</span>
+            <div class="bar-track"><div class="bar-fill" style="width:${(n/maxRef*100).toFixed(1)}%"></div></div>
+            <span class="bar-val">${n}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    document.getElementById('refresh-note').textContent = 'Actualizat: ' + new Date().toLocaleTimeString('ro-RO');
+  }
+</script>
+
+</body>
+</html>
