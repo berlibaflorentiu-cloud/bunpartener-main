@@ -2865,9 +2865,11 @@ async function resolveAtentie(id) {
 }
 
 async function deleteAtentie(id) {
+  if (!isAdmin(getCurrentUser())) return;
   if (!confirm('Ștergi această atenție?')) return;
-  const { error } = await db.from('atentii').delete().eq('id', id);
+  const { data, error } = await db.from('atentii').delete().eq('id', id).select();
   if (error) { alert(error.message); return; }
+  if (!data || !data.length) { alert('Ștergerea nu a fost permisă.'); return; }
   allAtentii = allAtentii.filter(a => a.id !== id);
   render();
 }
@@ -2888,6 +2890,8 @@ function renderAtentie(container) {
     return `<span style="font-size:12px;font-weight:600;color:${color}">${label}</span>`;
   }
 
+  const canDeleteAtentie = isAdmin(getCurrentUser());
+
   function itemRow(a, isResolved) {
     return `
       <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;gap:16px;flex-wrap:wrap;${isResolved?'opacity:0.6':''}">
@@ -2903,7 +2907,7 @@ function renderAtentie(container) {
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0">
           ${isResolved
-            ? `<button class="btn-delete" onclick="deleteAtentie('${a.id}')" aria-label="Șterge" title="Șterge">✕</button>`
+            ? (canDeleteAtentie ? `<button class="btn-delete" onclick="deleteAtentie('${a.id}')" aria-label="Șterge" title="Șterge">✕</button>` : '')
             : `<button class="btn-primary" style="font-size:13px;padding:7px 16px" onclick="resolveAtentie('${a.id}')">✓ Rezolvat</button>`
           }
         </div>
