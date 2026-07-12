@@ -2943,7 +2943,8 @@ function renderAtentie(container) {
     let label, color, bg, border;
     if      (diff < 0)  { label = `restant ${Math.abs(diff)} zi${Math.abs(diff)===1?'':'le'}`; color = 'var(--red)';  bg = 'rgba(248,81,73,0.16)';  border = 'rgba(248,81,73,0.45)'; }
     else if (diff === 0) { label = 'azi';                                                       color = 'var(--red)';  bg = 'rgba(248,81,73,0.16)';  border = 'rgba(248,81,73,0.45)'; }
-    else if (diff === 1) { label = 'mâine';                                                      color = '#f0b93f';     bg = 'rgba(240,185,63,0.16)'; border = 'rgba(240,185,63,0.45)'; }
+    else if (diff === 1) { label = 'mâine';                                                      color = 'var(--red)';  bg = 'rgba(248,81,73,0.16)';  border = 'rgba(248,81,73,0.45)'; }
+    else if (diff <= 3)  { label = `peste ${diff} zile`;                                         color = 'var(--red)';  bg = 'rgba(248,81,73,0.16)';  border = 'rgba(248,81,73,0.45)'; }
     else if (diff <= 7)  { label = `peste ${diff} zile`;                                         color = '#f0b93f';     bg = 'rgba(240,185,63,0.16)'; border = 'rgba(240,185,63,0.45)'; }
     else                 { label = `peste ${diff} zile`;                                         color = 'var(--muted)'; bg = 'rgba(139,148,158,0.12)'; border = 'rgba(139,148,158,0.3)'; }
     return `<span style="display:inline-flex;align-items:center;font-size:12.5px;font-weight:700;letter-spacing:.01em;padding:4px 11px;border-radius:20px;background:${bg};color:${color};border:1px solid ${border}">${label}</span>`;
@@ -3004,7 +3005,8 @@ function renderPersonalAtentii(container) {
     let label, color, bg, border;
     if      (diff < 0)  { label = `restant ${Math.abs(diff)} zi${Math.abs(diff)===1?'':'le'}`; color = 'var(--red)';  bg = 'rgba(248,81,73,0.16)';  border = 'rgba(248,81,73,0.45)'; }
     else if (diff === 0) { label = 'azi';                                                       color = 'var(--red)';  bg = 'rgba(248,81,73,0.16)';  border = 'rgba(248,81,73,0.45)'; }
-    else if (diff === 1) { label = 'mâine';                                                      color = '#f0b93f';     bg = 'rgba(240,185,63,0.16)'; border = 'rgba(240,185,63,0.45)'; }
+    else if (diff === 1) { label = 'mâine';                                                      color = 'var(--red)';  bg = 'rgba(248,81,73,0.16)';  border = 'rgba(248,81,73,0.45)'; }
+    else if (diff <= 3)  { label = `peste ${diff} zile`;                                         color = 'var(--red)';  bg = 'rgba(248,81,73,0.16)';  border = 'rgba(248,81,73,0.45)'; }
     else if (diff <= 7)  { label = `peste ${diff} zile`;                                         color = '#f0b93f';     bg = 'rgba(240,185,63,0.16)'; border = 'rgba(240,185,63,0.45)'; }
     else                 { label = `peste ${diff} zile`;                                         color = 'var(--muted)'; bg = 'rgba(139,148,158,0.12)'; border = 'rgba(139,148,158,0.3)'; }
     return `<span style="display:inline-flex;align-items:center;font-size:12.5px;font-weight:700;letter-spacing:.01em;padding:4px 11px;border-radius:20px;background:${bg};color:${color};border:1px solid ${border}">${label}</span>`;
