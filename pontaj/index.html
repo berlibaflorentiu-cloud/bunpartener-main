@@ -1232,11 +1232,22 @@ function dbTimeout(promise, ms = 14000) {
   ]);
 }
 
+// Fire-and-forget: ask the bnm-rate function to resolve (and cache) today's
+// rate the moment someone opens the app, so the first "Generează Actul" of
+// the day doesn't pay the BNM round-trip cost — it's already warm by then.
+// Errors are silently ignored; generateAct() still has its own fallback.
+function warmBnmRateCache() {
+  const now = new Date();
+  const dmy = `${String(now.getDate()).padStart(2,'0')}.${String(now.getMonth()+1).padStart(2,'0')}.${now.getFullYear()}`;
+  db.functions.invoke(`bnm-rate?date=${dmy}`, { method: 'GET' }).catch(() => {});
+}
+
 async function loadAll() {
   try {
     // Auth check is fast (separate service from DB)
     const { data: { user } } = await dbTimeout(db.auth.getUser(), 8000);
     if (!user) { showLoginScreen(); return; }
+    warmBnmRateCache();
 
     // Use cached profile to show the app instantly on return visits
     const cached = localStorage.getItem('pontaj_profile');
