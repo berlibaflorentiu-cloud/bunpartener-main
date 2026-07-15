@@ -4567,9 +4567,16 @@ async function generateAct() {
   let bnmRate = null, bnmRateDate = null;
   if (entries.length > 0) {
     try {
-      const { data, error } = await db.functions.invoke(`bnm-rate?date=${dayNow}.${monthNowN}.${yearNow}`, { method: 'GET' });
+      // The catch below only handles the *edge function erroring* — a slow or
+      // hanging BNM upstream doesn't error, it just never resolves, and an
+      // unbounded await here was blocking the whole act popup on it. Race it
+      // against a timeout so a degraded BNM endpoint costs at most 4s, not
+      // however long the request hangs.
+      const invokePromise = db.functions.invoke(`bnm-rate?date=${dayNow}.${monthNowN}.${yearNow}`, { method: 'GET' });
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('bnm-rate timeout')), 4000));
+      const { data, error } = await Promise.race([invokePromise, timeoutPromise]);
       if (!error && data && data.eur) { bnmRate = data.eur; bnmRateDate = data.date; }
-    } catch (e) { /* BNM indisponibil — se omite conversia / totalul complet */ }
+    } catch (e) { /* BNM indisponibil sau lent — se omite conversia / totalul complet */ }
   }
   const rate = bnmRate || 1; // graceful fallback if BNM is unreachable — avoids NaN totals
 
