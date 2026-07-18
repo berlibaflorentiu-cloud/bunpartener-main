@@ -786,6 +786,55 @@
       width: 210mm;
       height: 148mm;
     }
+    #bon-document .bon-copy {
+      position: relative;
+      width: 210mm;
+      height: 148mm;
+      overflow: hidden;
+    }
+    #bon-document .bon-copy .bon-template-canvas {
+      position: absolute;
+      inset: 0;
+    }
+    #bon-document .bon-edit-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    #bon-document .bon-edit-field {
+      position: absolute;
+      box-sizing: border-box;
+      color: #050505;
+      font-family: Arial, sans-serif;
+      line-height: 1.05;
+      overflow: hidden;
+      white-space: nowrap;
+      outline: none;
+      pointer-events: auto;
+    }
+    #bon-document .bon-edit-field[data-multiline="1"] {
+      white-space: normal;
+      overflow-wrap: break-word;
+      line-height: 1.76;
+    }
+    #bon-document .bon-edit-field:hover,
+    #bon-document .bon-edit-field:focus {
+      background: rgba(213, 177, 104, .14);
+      box-shadow: inset 0 0 0 .25mm rgba(180, 137, 53, .7);
+    }
+    .bon-edit-hint {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 10px;
+    }
+    @media print {
+      .bon-edit-hint { display: none !important; }
+      #bon-document .bon-edit-field:hover,
+      #bon-document .bon-edit-field:focus {
+        background: transparent !important;
+        box-shadow: none !important;
+      }
+    }
     #bon-document .bon-cut-line {
       width: 210mm;
       height: 1mm;
@@ -4764,11 +4813,75 @@ async function confirmBon(id) {
 // ── Printable Bon document + PDF/print ──────────────────
 
 function renderBonDocumentHTML(r) {
-  return `<div id="bon-document" class="bon-scan-document">
-    <canvas class="bon-template-canvas" data-copy="1" width="1489" height="1050" aria-label="Bon de plată - exemplarul 1"></canvas>
-    <div class="bon-cut-line" aria-hidden="true"></div>
-    <canvas class="bon-template-canvas" data-copy="2" width="1489" height="1050" aria-label="Bon de plată - exemplarul 2"></canvas>
+  const total = (Number(r.plata_baza) || 0) + (Number(r.compensare) || 0);
+  const money = value => Number(value || 0).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const seriesMatch = (r.serie_nr || '').match(/^([A-ZĂÂÎȘȚ]*)(\d*)$/i);
+  const seriesPart = seriesMatch?.[1] || '';
+  const numberPart = seriesMatch?.[2] || r.serie_nr || '';
+  const fields = [
+    ['series', seriesPart, 440, 102, 115, 34, 27, 'left'],
+    ['number', numberPart, 602, 102, 190, 34, 27, 'left'],
+    ['date', fmtDateLongRO(r.date), 214, 162, 280, 36, 27, 'left'],
+    ['firm', BON_FIRM.name, 367, 211, 760, 36, 25, 'center'],
+    ['firm-address', `or. ${BON_FIRM.address.replace(/^mun\\.\\s*/i, '')}`, 337, 264, 820, 36, 25, 'center'],
+    ['firm-code', BON_FIRM.fiscalCode, 1145, 228, 230, 36, 24, 'center'],
+    ['client', r.client_name || '', 337, 319, 820, 40, 29, 'center'],
+    ['personal-code', r.cod_personal || '', 1145, 341, 230, 36, 23, 'center'],
+    ['address', r.bon_address || '', 337, 373, 820, 36, 25, 'center'],
+    ['description', r.bon_description || '', 146, 523, 480, 176, 25, 'left', 1],
+    ['unit-type', 'serv.', 635, 525, 82, 35, 23, 'center'],
+    ['quantity', 'unit.', 719, 523, 84, 37, 25, 'center'],
+  ];
+  if (Number(r.plata_baza) > 0) {
+    fields.push(['base-value', money(r.plata_baza), 786, 523, 145, 36, 26, 'right']);
+    fields.push(['base-total', money(r.plata_baza), 1240, 523, 150, 36, 24, 'center']);
+  }
+  if (Number(r.compensare) > 0) {
+    fields.push(['comp-label', 'Compensare cheltuieli', 146, 568, 480, 34, 23, 'left']);
+    fields.push(['comp-value', money(r.compensare), 786, 568, 145, 34, 25, 'right']);
+    fields.push(['comp-total', money(r.compensare), 1240, 568, 150, 34, 24, 'center']);
+  }
+  fields.push(['grand-total', money(total), 1240, 782, 150, 36, 24, 'center']);
+  fields.push(['total-words', amountToWordsRO(total), 431, 820, 1050, 38, 26, 'center']);
+
+  const fieldHtml = fields.map(([key, value, x, y, width, height, fontSize, align, multiline]) => `
+    <div class="bon-edit-field" contenteditable="true" spellcheck="false"
+      data-bon-field="${key}" data-multiline="${multiline ? '1' : '0'}" data-max-font="${fontSize}"
+      oninput="_bonSyncEditableField(this)"
+      onkeydown="if(this.dataset.multiline!=='1' && event.key==='Enter'){event.preventDefault();this.blur();}"
+      style="left:${x/1489*100}%;top:${y/1050*100}%;width:${width/1489*100}%;height:${height/1050*100}%;font-size:${fontSize/1489*210}mm;text-align:${align}">${esc(value)}</div>`).join('');
+
+  const copy = number => `<div class="bon-copy">
+    <canvas class="bon-template-canvas" data-copy="${number}" width="1489" height="1050" aria-label="Bon de plată - exemplarul ${number}"></canvas>
+    <div class="bon-edit-layer">${fieldHtml}</div>
   </div>`;
+  return `<div id="bon-document" class="bon-scan-document">
+    ${copy(1)}
+    <div class="bon-cut-line" aria-hidden="true"></div>
+    ${copy(2)}
+  </div>`;
+}
+
+function _bonFitEditableField(el) {
+  const max = Number(el.dataset.maxFont || 24);
+  let size = max;
+  el.style.fontSize = `${size / 1489 * 210}mm`;
+  while ((el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1) && size > 13) {
+    size -= 1;
+    el.style.fontSize = `${size / 1489 * 210}mm`;
+  }
+}
+
+function _bonSyncEditableField(source) {
+  const key = source.dataset.bonField;
+  document.querySelectorAll(`#bon-document .bon-edit-field[data-bon-field="${key}"]`).forEach(el => {
+    if (el !== source) el.innerText = source.innerText;
+    _bonFitEditableField(el);
+  });
+}
+
+function _bonFitAllEditableFields() {
+  document.querySelectorAll('#bon-document .bon-edit-field').forEach(_bonFitEditableField);
 }
 
 function _bonCanvasText(ctx, text, x, y, font, align = 'left') {
@@ -4801,12 +4914,6 @@ async function renderBonScanToCanvas(r) {
   const pdf = await pdfjsLib.getDocument('/pontaj/bon-template.pdf').promise;
   const page = await pdf.getPage(1);
   const viewport = page.getViewport({ scale: 2.5 });
-  const total = (Number(r.plata_baza) || 0) + (Number(r.compensare) || 0);
-  const money = value => Number(value || 0).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const seriesMatch = (r.serie_nr || '').match(/^([A-ZĂÂÎȘȚ]*)(\d*)$/i);
-  const seriesPart = seriesMatch?.[1] || '';
-  const numberPart = seriesMatch?.[2] || r.serie_nr || '';
-
   for (const canvas of canvases) {
     canvas.width = Math.round(viewport.width);
     canvas.height = Math.round(viewport.height);
@@ -4828,32 +4935,6 @@ async function renderBonScanToCanvas(r) {
       _bonCanvasText(ctx, 'экз. - клиенту', 181, 96, '16px "Times New Roman"');
     }
 
-    _bonCanvasText(ctx, seriesPart, 440, 129, '27px Arial');
-    _bonCanvasText(ctx, numberPart, 602, 129, '27px Arial');
-    _bonCanvasText(ctx, fmtDateLongRO(r.date), 214, 190, '27px Arial');
-    _bonCanvasText(ctx, BON_FIRM.name, 747, 239, '25px Arial', 'center');
-    _bonCanvasText(ctx, `or. ${BON_FIRM.address.replace(/^mun\.\s*/i, '')}`, 747, 292, '25px Arial', 'center');
-    _bonCanvasText(ctx, BON_FIRM.fiscalCode, 1260, 256, '24px Arial', 'center');
-    _bonCanvasText(ctx, r.client_name || '', 747, 350, '29px Arial', 'center');
-    _bonCanvasText(ctx, r.cod_personal || '', 1260, 369, '23px Arial', 'center');
-    _bonCanvasText(ctx, r.bon_address || '', 747, 401, '25px Arial', 'center');
-
-    ctx.font = '25px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#050505';
-    _bonWrapCanvasText(ctx, r.bon_description || '', 146, 552, 480, 44, 4);
-    _bonCanvasText(ctx, 'serv.', 676, 552, '23px Arial', 'center');
-    _bonCanvasText(ctx, 'unit.', 761, 552, '25px Arial', 'center');
-    if (Number(r.plata_baza) > 0) {
-      _bonCanvasText(ctx, money(r.plata_baza), 931, 552, '26px Arial', 'right');
-      _bonCanvasText(ctx, money(r.plata_baza), 1315, 552, '24px Arial', 'center');
-    }
-    if (Number(r.compensare) > 0) {
-      _bonCanvasText(ctx, 'Compensare cheltuieli', 146, 596, '23px Arial');
-      _bonCanvasText(ctx, money(r.compensare), 931, 596, '25px Arial', 'right');
-      _bonCanvasText(ctx, money(r.compensare), 1315, 596, '24px Arial', 'center');
-    }
-    _bonCanvasText(ctx, money(total), 1315, 810, '24px Arial', 'center');
-    _bonCanvasText(ctx, amountToWordsRO(total), 956, 850, '26px Arial', 'center');
-
     // Copy 3 is otherwise clean but omits the firm's signature block found on
     // copies 1 and 2. Restore it identically on both generated copies.
     ctx.beginPath();
@@ -4869,6 +4950,7 @@ async function renderBonScanToCanvas(r) {
     ctx.restore();
     canvas.dataset.ready = '1';
   }
+  _bonFitAllEditableFields();
 }
 
 async function openBonPrintView(id) {
@@ -4880,7 +4962,9 @@ async function openBonPrintView(id) {
     <button class="btn-ghost" onclick="window.print()">Tipărește</button>
     <button class="btn-ghost" onclick="closeModal()">✕</button>
   `;
-  document.getElementById('modal-body').innerHTML = renderBonDocumentHTML(r);
+  document.getElementById('modal-body').innerHTML = `
+    <p class="bon-edit-hint">Poți edita orice text direct pe bon înainte de a-l descărca sau tipări. Ambele exemplare se actualizează simultan.</p>
+    ${renderBonDocumentHTML(r)}`;
   document.querySelector('.modal')?.classList.add('modal-wide');
   document.getElementById('modal-overlay').style.display = 'flex';
   try {
