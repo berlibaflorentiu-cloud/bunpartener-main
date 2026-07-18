@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"
@@ -732,8 +733,9 @@
       }
       /* The physical pre-numbered Bon pads are A5 landscape. Keep this scoped
          to the Bon so the A4 Act document remains unchanged. */
-      #bon-document { page: bon-page; width: 198mm; height: 136mm; margin: 0 auto; }
-      @page bon-page { size: A5 landscape; margin: 6mm; }
+      #bon-document { page: bon-page; margin: 0 auto; }
+      #bon-document.bon-scan-document { width: 210mm; height: 148mm; }
+      @page bon-page { size: A5 landscape; margin: 0; }
     }
 
     /* ── ACT DOCUMENT — editable before print/download/save ── */
@@ -773,6 +775,17 @@
       padding: 8mm 9mm 5mm;
       position: relative;
       overflow: hidden;
+    }
+    #bon-document.bon-scan-document {
+      width: 210mm;
+      height: 148mm;
+      padding: 0;
+      border: 0;
+    }
+    #bon-document .bon-template-canvas {
+      display: block;
+      width: 210mm;
+      height: 148mm;
     }
     #bon-document .bon-formular-tip {
       text-align: right;
@@ -4747,115 +4760,100 @@ async function confirmBon(id) {
 // ── Printable Bon document + PDF/print ──────────────────
 
 function renderBonDocumentHTML(r) {
-  const total = (Number(r.plata_baza)||0) + (Number(r.compensare)||0);
-  // serie_nr is stored as the letter series and number concatenated
-  // (e.g. "DAA76695045") — split it back apart for display.
-  const serieMatch = (r.serie_nr || '').match(/^([A-ZĂÂÎȘȚ]*)(\d*)$/i);
-  const seriaPart = serieMatch ? serieMatch[1] : '';
-  const numberPart = serieMatch ? serieMatch[2] : (r.serie_nr || '');
-  const rows = [];
-  if (Number(r.plata_baza) > 0) rows.push({ desc: r.bon_description || '', amount: Number(r.plata_baza) });
-  if (Number(r.compensare) > 0) rows.push({ desc: 'Compensare cheltuieli conform contractului menționat mai sus.', amount: Number(r.compensare) });
-  if (rows.length === 0) rows.push({ desc: r.bon_description || '', amount: 0 });
+  return `<div id="bon-document" class="bon-scan-document"><canvas id="bon-template-canvas" class="bon-template-canvas" width="2105" height="1488" aria-label="Bon de plată"></canvas></div>`;
+}
 
-  const blankRows = Math.max(0, 2 - rows.length);
+function _bonCanvasText(ctx, text, x, y, font, align = 'left') {
+  ctx.font = font;
+  ctx.fillStyle = '#050505';
+  ctx.textAlign = align;
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(text || '', x, y);
+}
 
-  return `
-    <div id="bon-document">
-      <div class="bon-formular-tip">
-        <div><strong>Formular tipizat</strong></div>
-        <div>Типовая форма</div>
-        <div style="margin-top:4px">Aprobat prin Ordinul comun al Departamentului Statisticii al Republicii Moldova<br>
-        și Ministerul Finanțelor al Republicii Moldova nr.24/36 din 25 martie 1998</div>
-        <div>Утверждена совместным приказом Департамента статистики и Министер-<br>ства финансов Республики Молдова № 24/36 от 25 марта 1998 г.</div>
-      </div>
+function _bonWrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 4) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  words.forEach(word => {
+    const test = line ? `${line} ${word}` : word;
+    if (line && ctx.measureText(test).width > maxWidth) {
+      lines.push(line);
+      line = word;
+    } else line = test;
+  });
+  if (line) lines.push(line);
+  lines.slice(0, maxLines).forEach((value, i) => ctx.fillText(value, x, y + i * lineHeight));
+}
 
-      <div class="bon-head-row">
-        <div class="bon-title-wrap">
-          <div>
-            <div class="bon-title">BON DE PLATĂ</div>
-            <div class="bon-title-sub">Квитанция</div>
-          </div>
-          <div class="bon-seria-nr">Seria ${esc(seriaPart)} &nbsp;&nbsp; Nr. ${esc(numberPart)}</div>
-        </div>
-      </div>
-      <div class="bon-date-row">
-        <div class="bon-field-label">Data<br>Дата</div>
-        <div class="bon-field-value">${fmtDate(r.date)}</div>
-      </div>
+async function renderBonScanToCanvas(r) {
+  const canvas = document.getElementById('bon-template-canvas');
+  if (!canvas || !window.pdfjsLib) throw new Error('PDF.js nu este disponibil.');
+  const url = await getBonAssetUrl('bon-template-source.pdf');
+  if (!url) throw new Error('Șablonul privat al bonului nu a putut fi încărcat.');
 
-      <div class="bon-field-row">
-        <div class="bon-field-label">Denumirea întreprinderii<br>Наименование предприятия</div>
-        <div class="bon-field-value">
-          <div class="bon-field-value-main">${esc(BON_FIRM.name)}</div>
-          <div class="bon-field-value-sub">adresa juridică: ${esc(BON_FIRM.address)}</div>
-        </div>
-        <div class="bon-field-code">Cod fiscal<br>Фискальный код <strong>${esc(BON_FIRM.fiscalCode)}</strong></div>
-      </div>
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({ url }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 2.5 });
+  canvas.width = Math.round(viewport.width);
+  canvas.height = Math.round(viewport.height);
+  const ctx = canvas.getContext('2d', { alpha: false });
+  await page.render({ canvasContext: ctx, viewport }).promise;
 
-      <div class="bon-field-row">
-        <div class="bon-field-label">Denumirea beneficiarului<br>Наименование заказчика</div>
-        <div class="bon-field-value">
-          <div class="bon-field-value-main">${esc(r.client_name)}</div>
-          <div class="bon-field-value-sub">${esc(r.bon_address||'')}</div>
-        </div>
-        <div class="bon-field-code">Cod fiscal<br>Фискальный код <strong>${esc(r.cod_personal||'—')}</strong></div>
-      </div>
+  // All coordinates are measured against the supplied 2105 × 1488 scan.
+  // Only variable sample entries and the beneficiary's handwritten signature
+  // are cleared; every preprinted pixel and the left stamp/signature remain.
+  ctx.save();
+  ctx.scale(canvas.width / 2105, canvas.height / 1488);
+  ctx.fillStyle = '#fff';
+  const clear = (x, y, w, h) => ctx.fillRect(x, y, w, h);
+  const rule = (x1, y1, x2, y2, width = 2) => {
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+    ctx.strokeStyle = '#111'; ctx.lineWidth = width; ctx.stroke();
+  };
 
-      <table class="bon-table">
-        <thead>
-          <tr>
-            <th style="width:46%">Denumirea mărfii (lucrărilor, serviciilor)<br>Наименование товара (работ, услуг)</th>
-            <th style="width:6%">Unit. de măsură<br>Единица изм.</th>
-            <th style="width:7%">Cantitatea<br>Количество</th>
-            <th style="width:10%">Valoarea fără TVA, lei<br>Стоимость без НДС, леев</th>
-            <th style="width:6%">Suma TVA, lei<br>Сумма НДС, леев</th>
-            <th style="width:11%">Impozitul pe venit aferent serviciilor, lei<br>Подоходный налог с услуг, леев</th>
-            <th style="width:14%">Total de plată, lei<br>Общая сумма к оплате, леев</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows.map(row => `
-            <tr>
-              <td class="bon-desc-cell">${esc(row.desc)}</td>
-              <td style="text-align:center">serv.</td>
-              <td style="text-align:center">unit.</td>
-              <td class="bon-num-cell">${row.amount > 0 ? row.amount.toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}</td>
-              <td></td>
-              <td></td>
-              <td class="bon-num-cell">${row.amount > 0 ? row.amount.toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}</td>
-            </tr>`).join('')}
-          ${Array.from({length: Math.max(4, blankRows)}).map(() => `
-            <tr><td class="bon-desc-cell">&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}
-          <tr>
-            <td colspan="6" style="text-align:right;font-weight:600">TOTAL</td>
-            <td class="bon-num-cell" style="font-weight:700">${total.toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-          </tr>
-        </tbody>
-      </table>
+  clear(827, 188, 190, 48);                                  // receipt number
+  clear(370, 260, 365, 45); rule(376, 299, 727, 299, 2);    // date
+  clear(805, 459, 425, 50);                                 // beneficiary name
+  clear(675, 527, 570, 43); rule(320, 573, 1853, 573, 2);   // beneficiary address
+  clear(1528, 483, 311, 37);                                // beneficiary ID
+  clear(321, 707, 600, 207);                                // description cells
+  [757, 809, 861, 913].forEach(y => rule(319, y, 927, y, 2));
+  clear(1142, 710, 160, 43);                                // first amount
+  clear(1684, 710, 163, 43);                                // first row total
+  clear(1142, 762, 160, 43);                                // second amount
+  clear(1684, 762, 163, 43);                                // second row total
+  clear(1684, 1018, 163, 45);                               // grand total
+  clear(902, 1068, 520, 49); rule(802, 1117, 1850, 1117, 2);// amount in words
+  clear(1330, 1080, 285, 105); rule(1320, 1187, 1802, 1187, 2);// client signature
+  clear(1850, 1370, 245, 110);                              // scanner watermark
 
-      <div class="bon-total-words">
-        <span>Total încasat<br><span style="font-size:9px;color:#666">Получено всего</span></span>
-        <strong>${amountToWordsRO(total)}</strong>
-      </div>
+  const total = (Number(r.plata_baza) || 0) + (Number(r.compensare) || 0);
+  const money = value => Number(value || 0).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const numberPart = ((r.serie_nr || '').match(/(\d+)$/) || [,''])[1];
 
-      <div class="bon-sign-row">
-        <div class="bon-sign-block">
-          <div class="bon-sign-visual">
-            <img class="bon-stamp-img" data-asset="stamp-bunpartener.png" alt="">
-            <img class="bon-casier-sig-img" data-asset="semnatura-casier.png" alt="">
-          </div>
-          <div class="bon-sign-label">Semnătura casierului<br>Подпись кассира</div>
-        </div>
-        <div class="bon-sign-block">
-          <div class="bon-sign-line"></div>
-          <div class="bon-sign-label">Semnătura beneficiarului<br>Подпись заказчика</div>
-        </div>
-      </div>
+  _bonCanvasText(ctx, numberPart, 842, 226, '600 25px Arial');
+  _bonCanvasText(ctx, fmtDate(r.date), 380, 294, '26px Arial');
+  _bonCanvasText(ctx, r.client_name || '', 1030, 500, '28px Arial', 'center');
+  _bonCanvasText(ctx, r.bon_address || '', 1050, 560, '24px Arial', 'center');
+  _bonCanvasText(ctx, r.cod_personal || '', 1684, 513, '24px Arial', 'center');
 
-      <div class="bon-footer-print">Editura de Imprimate „Statistica”, a5 (355n), 11.02. t.5000×50×2</div>
-    </div>
-  `;
+  ctx.font = '27px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#050505';
+  _bonWrapCanvasText(ctx, r.bon_description || '', 327, 744, 585, 50, 4);
+  if (Number(r.plata_baza) > 0) {
+    _bonCanvasText(ctx, money(r.plata_baza), 1290, 743, '27px Arial', 'right');
+    _bonCanvasText(ctx, money(r.plata_baza), 1835, 743, '27px Arial', 'right');
+  }
+  if (Number(r.compensare) > 0) {
+    _bonCanvasText(ctx, 'Compensare cheltuieli', 327, 795, '25px Arial');
+    _bonCanvasText(ctx, money(r.compensare), 1290, 795, '27px Arial', 'right');
+    _bonCanvasText(ctx, money(r.compensare), 1835, 795, '27px Arial', 'right');
+  }
+  _bonCanvasText(ctx, money(total), 1835, 1054, '600 27px Arial', 'right');
+  _bonCanvasText(ctx, amountToWordsRO(total), 1160, 1107, '27px Arial', 'center');
+  ctx.restore();
+  canvas.dataset.ready = '1';
 }
 
 // The BuNPartener stamp + cashier signature live in a private Supabase
@@ -4884,23 +4882,24 @@ async function openBonPrintView(id) {
   document.getElementById('modal-body').innerHTML = renderBonDocumentHTML(r);
   document.querySelector('.modal')?.classList.add('modal-wide');
   document.getElementById('modal-overlay').style.display = 'flex';
-
-  document.querySelectorAll('#bon-document img[data-asset]').forEach(async img => {
-    const url = await getBonAssetUrl(img.dataset.asset);
-    if (url) img.src = url;
-  });
+  try {
+    await renderBonScanToCanvas(r);
+  } catch (error) {
+    document.getElementById('modal-body').innerHTML = `<p style="padding:24px;color:var(--red)">Eroare la încărcarea șablonului: ${esc(error.message)}</p>`;
+  }
 }
 
 async function downloadBonPDF(id) {
   const el = document.getElementById('bon-document');
   if (!el) return;
-  // Stamp/signature <img> src is set asynchronously (signed Storage URL) —
-  // wait for them so the PDF never captures a blank signature area.
-  const imgs = [...el.querySelectorAll('img[data-asset]')];
-  await Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(res => { img.onload = res; img.onerror = res; })));
+  const canvas = el.querySelector('#bon-template-canvas');
+  if (!canvas || canvas.dataset.ready !== '1') {
+    alert('Șablonul bonului încă se încarcă. Încercați din nou peste o clipă.');
+    return;
+  }
   const r = allReceipts.find(x => x.id === id);
   html2pdf().set({
-    margin: [6, 6, 6, 6],
+    margin: [0, 0, 0, 0],
     filename: `bon-${(r?.serie_nr || 'plata').replace(/\s+/g,'-')}.pdf`,
     image:    { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 3, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' },
