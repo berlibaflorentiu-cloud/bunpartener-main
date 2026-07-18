@@ -4851,6 +4851,18 @@ async function renderBonScanToCanvas(r) {
     }
     _bonCanvasText(ctx, money(total), 1362, 810, '26px Arial', 'right');
     _bonCanvasText(ctx, amountToWordsRO(total), 956, 850, '26px Arial', 'center');
+
+    // Copy 3 is otherwise clean but omits the firm's signature block found on
+    // copies 1 and 2. Restore it identically on both generated copies.
+    ctx.beginPath();
+    ctx.moveTo(388, 917);
+    ctx.lineTo(780, 917);
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    _bonCanvasText(ctx, 'Semnătura casierului', 584, 940, '17px "Times New Roman"', 'center');
+    _bonCanvasText(ctx, 'Подпись кассира', 584, 961, '17px "Times New Roman"', 'center');
+
     ctx.restore();
     canvas.dataset.ready = '1';
   }
