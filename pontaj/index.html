@@ -731,11 +731,10 @@
         --border: #ddd; --surface2: #f5f5f5; --gold-dim: #f9f4ea;
         --bg: white; --surface: white;
       }
-      /* The physical pre-numbered Bon pads are A5 landscape. Keep this scoped
-         to the Bon so the A4 Act document remains unchanged. */
+      /* Two A5 Bon copies are stacked on one A4 portrait sheet for cutting. */
       #bon-document { page: bon-page; margin: 0 auto; }
-      #bon-document.bon-scan-document { width: 210mm; height: 148mm; }
-      @page bon-page { size: A5 landscape; margin: 0; }
+      #bon-document.bon-scan-document { width: 210mm; height: 297mm; }
+      @page bon-page { size: A4 portrait; margin: 0; }
     }
 
     /* ── ACT DOCUMENT — editable before print/download/save ── */
@@ -778,7 +777,7 @@
     }
     #bon-document.bon-scan-document {
       width: 210mm;
-      height: 148mm;
+      height: 297mm;
       padding: 0;
       border: 0;
     }
@@ -786,6 +785,12 @@
       display: block;
       width: 210mm;
       height: 148mm;
+    }
+    #bon-document .bon-cut-line {
+      width: 210mm;
+      height: 1mm;
+      border-top: .2mm dashed #999;
+      box-sizing: border-box;
     }
     #bon-document .bon-formular-tip {
       text-align: right;
@@ -4760,7 +4765,11 @@ async function confirmBon(id) {
 // ── Printable Bon document + PDF/print ──────────────────
 
 function renderBonDocumentHTML(r) {
-  return `<div id="bon-document" class="bon-scan-document"><canvas id="bon-template-canvas" class="bon-template-canvas" width="2105" height="1488" aria-label="Bon de plată"></canvas></div>`;
+  return `<div id="bon-document" class="bon-scan-document">
+    <canvas class="bon-template-canvas" data-copy="1" width="1489" height="1050" aria-label="Bon de plată - exemplarul 1"></canvas>
+    <div class="bon-cut-line" aria-hidden="true"></div>
+    <canvas class="bon-template-canvas" data-copy="2" width="1489" height="1050" aria-label="Bon de plată - exemplarul 2"></canvas>
+  </div>`;
 }
 
 function _bonCanvasText(ctx, text, x, y, font, align = 'left') {
@@ -4787,101 +4796,64 @@ function _bonWrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 4)
 }
 
 async function renderBonScanToCanvas(r) {
-  const canvas = document.getElementById('bon-template-canvas');
-  if (!canvas || !window.pdfjsLib) throw new Error('PDF.js nu este disponibil.');
-  const url = await getBonAssetUrl('bon-template-source.pdf');
-  if (!url) throw new Error('Șablonul privat al bonului nu a putut fi încărcat.');
-
+  const canvases = [...document.querySelectorAll('#bon-document .bon-template-canvas')];
+  if (canvases.length !== 2 || !window.pdfjsLib) throw new Error('PDF.js nu este disponibil.');
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  const pdf = await pdfjsLib.getDocument({ url }).promise;
+  const pdf = await pdfjsLib.getDocument('/pontaj/bon-template.pdf').promise;
   const page = await pdf.getPage(1);
   const viewport = page.getViewport({ scale: 2.5 });
-  canvas.width = Math.round(viewport.width);
-  canvas.height = Math.round(viewport.height);
-  const ctx = canvas.getContext('2d', { alpha: false });
-  await page.render({ canvasContext: ctx, viewport }).promise;
-
-  // All coordinates are measured against the supplied 2105 × 1488 scan.
-  // Only variable sample entries and the beneficiary's handwritten signature
-  // are cleared; every preprinted pixel and the left stamp/signature remain.
-  ctx.save();
-  ctx.scale(canvas.width / 2105, canvas.height / 1488);
-  // Use a real blank-paper sample from the scan instead of flat white. This
-  // keeps the corrected areas visually continuous with the photographed page
-  // and avoids obvious rectangular blocks.
-  const paperTile = document.createElement('canvas');
-  paperTile.width = 96;
-  paperTile.height = 96;
-  paperTile.getContext('2d').drawImage(canvas, 185, 88, 96, 96, 0, 0, 96, 96);
-  const paperPattern = ctx.createPattern(paperTile, 'repeat');
-  const clear = (x, y, w, h) => {
-    ctx.save();
-    ctx.fillStyle = paperPattern || '#fff';
-    ctx.fillRect(x, y, w, h);
-    ctx.restore();
-  };
-  const rule = (x1, y1, x2, y2, width = 2) => {
-    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
-    ctx.strokeStyle = '#111'; ctx.lineWidth = width; ctx.stroke();
-  };
-
-  clear(827, 188, 190, 48);                                  // receipt number
-  clear(370, 260, 365, 45); rule(376, 299, 727, 299, 2);    // date
-  clear(805, 459, 425, 50);                                 // beneficiary name
-  // Start below the small bilingual name caption so it remains untouched.
-  clear(675, 535, 570, 35); rule(320, 573, 1853, 573, 2);   // beneficiary address
-  clear(1528, 483, 311, 37);                                // beneficiary ID
-  clear(321, 707, 600, 207);                                // description cells
-  [757, 809, 861, 913].forEach(y => rule(319, y, 927, y, 2));
-  clear(1142, 710, 160, 43);                                // first amount
-  clear(1684, 710, 163, 43);                                // first row total
-  clear(1142, 762, 160, 43);                                // second amount
-  clear(1684, 762, 163, 43);                                // second row total
-  clear(1684, 1018, 163, 45);                               // grand total
-  clear(905, 1072, 455, 42); rule(802, 1117, 1850, 1117, 2);// amount in words
-  // Clear only the blue handwriting, not the surrounding signature structure.
-  clear(1350, 1090, 185, 92); rule(1320, 1187, 1802, 1187, 2);// client signature
-  clear(1850, 1370, 245, 110);                              // scanner watermark
-
   const total = (Number(r.plata_baza) || 0) + (Number(r.compensare) || 0);
   const money = value => Number(value || 0).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const numberPart = ((r.serie_nr || '').match(/(\d+)$/) || [,''])[1];
+  const seriesMatch = (r.serie_nr || '').match(/^([A-ZĂÂÎȘȚ]*)(\d*)$/i);
+  const seriesPart = seriesMatch?.[1] || '';
+  const numberPart = seriesMatch?.[2] || r.serie_nr || '';
 
-  _bonCanvasText(ctx, numberPart, 842, 226, '600 25px Arial');
-  _bonCanvasText(ctx, fmtDate(r.date), 380, 294, '26px Arial');
-  _bonCanvasText(ctx, r.client_name || '', 1030, 500, '28px Arial', 'center');
-  _bonCanvasText(ctx, r.bon_address || '', 1050, 560, '24px Arial', 'center');
-  _bonCanvasText(ctx, r.cod_personal || '', 1684, 513, '24px Arial', 'center');
+  for (const canvas of canvases) {
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+    const ctx = canvas.getContext('2d', { alpha: false });
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    ctx.save();
+    ctx.scale(canvas.width / 1489, canvas.height / 1050);
 
-  ctx.font = '27px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#050505';
-  _bonWrapCanvasText(ctx, r.bon_description || '', 327, 744, 585, 50, 4);
-  if (Number(r.plata_baza) > 0) {
-    _bonCanvasText(ctx, money(r.plata_baza), 1290, 743, '27px Arial', 'right');
-    _bonCanvasText(ctx, money(r.plata_baza), 1835, 743, '27px Arial', 'right');
+    // Copy 3 is the clean source. Remove only its copy marker; copy 1 stays
+    // unnumbered, while copy 2 receives the client-copy marker.
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(140, 55, 220, 48);
+    if (canvas.dataset.copy === '2') {
+      _bonCanvasText(ctx, '2', 151, 98, '700 38px "Times New Roman"');
+      _bonCanvasText(ctx, 'ex. - clientului', 181, 75, '16px "Times New Roman"');
+      _bonCanvasText(ctx, 'экз. - клиенту', 181, 96, '16px "Times New Roman"');
+    }
+
+    _bonCanvasText(ctx, seriesPart, 440, 129, '27px Arial');
+    _bonCanvasText(ctx, numberPart, 602, 129, '27px Arial');
+    _bonCanvasText(ctx, fmtDateLongRO(r.date), 214, 190, '27px Arial');
+    _bonCanvasText(ctx, BON_FIRM.name, 747, 239, '25px Arial', 'center');
+    _bonCanvasText(ctx, `or. ${BON_FIRM.address.replace(/^mun\.\s*/i, '')}`, 747, 292, '25px Arial', 'center');
+    _bonCanvasText(ctx, BON_FIRM.fiscalCode, 1260, 256, '24px Arial', 'center');
+    _bonCanvasText(ctx, r.client_name || '', 747, 350, '29px Arial', 'center');
+    _bonCanvasText(ctx, r.cod_personal || '', 1260, 369, '23px Arial', 'center');
+    _bonCanvasText(ctx, r.bon_address || '', 747, 401, '25px Arial', 'center');
+
+    ctx.font = '25px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#050505';
+    _bonWrapCanvasText(ctx, r.bon_description || '', 146, 552, 480, 44, 4);
+    _bonCanvasText(ctx, 'serv.', 657, 552, '25px Arial', 'center');
+    _bonCanvasText(ctx, 'unit.', 761, 552, '25px Arial', 'center');
+    if (Number(r.plata_baza) > 0) {
+      _bonCanvasText(ctx, money(r.plata_baza), 931, 552, '26px Arial', 'right');
+      _bonCanvasText(ctx, money(r.plata_baza), 1362, 552, '26px Arial', 'right');
+    }
+    if (Number(r.compensare) > 0) {
+      _bonCanvasText(ctx, 'Compensare cheltuieli', 146, 596, '23px Arial');
+      _bonCanvasText(ctx, money(r.compensare), 931, 596, '25px Arial', 'right');
+      _bonCanvasText(ctx, money(r.compensare), 1362, 596, '25px Arial', 'right');
+    }
+    _bonCanvasText(ctx, money(total), 1362, 810, '26px Arial', 'right');
+    _bonCanvasText(ctx, amountToWordsRO(total), 956, 850, '26px Arial', 'center');
+    ctx.restore();
+    canvas.dataset.ready = '1';
   }
-  if (Number(r.compensare) > 0) {
-    _bonCanvasText(ctx, 'Compensare cheltuieli', 327, 795, '25px Arial');
-    _bonCanvasText(ctx, money(r.compensare), 1290, 795, '27px Arial', 'right');
-    _bonCanvasText(ctx, money(r.compensare), 1835, 795, '27px Arial', 'right');
-  }
-  _bonCanvasText(ctx, money(total), 1835, 1054, '600 27px Arial', 'right');
-  _bonCanvasText(ctx, amountToWordsRO(total), 1160, 1107, '27px Arial', 'center');
-  ctx.restore();
-  canvas.dataset.ready = '1';
-}
-
-// The BuNPartener stamp + cashier signature live in a private Supabase
-// Storage bucket (bon-assets, admin-only RLS) rather than as public files —
-// this project deploys via a public GitHub Pages repo, so anything checked
-// into it would be a permanently downloadable image of the firm's real seal
-// and a real signature. Signed URLs are fetched on demand and expire soon after.
-const _bonAssetUrlCache = {};
-async function getBonAssetUrl(path) {
-  if (_bonAssetUrlCache[path]) return _bonAssetUrlCache[path];
-  const { data, error } = await db.storage.from('bon-assets').createSignedUrl(path, 600);
-  if (error || !data) return null;
-  _bonAssetUrlCache[path] = data.signedUrl;
-  return data.signedUrl;
 }
 
 async function openBonPrintView(id) {
@@ -4906,8 +4878,8 @@ async function openBonPrintView(id) {
 async function downloadBonPDF(id) {
   const el = document.getElementById('bon-document');
   if (!el) return;
-  const canvas = el.querySelector('#bon-template-canvas');
-  if (!canvas || canvas.dataset.ready !== '1') {
+  const canvases = [...el.querySelectorAll('.bon-template-canvas')];
+  if (canvases.length !== 2 || canvases.some(canvas => canvas.dataset.ready !== '1')) {
     alert('Șablonul bonului încă se încarcă. Încercați din nou peste o clipă.');
     return;
   }
@@ -4917,7 +4889,7 @@ async function downloadBonPDF(id) {
     filename: `bon-${(r?.serie_nr || 'plata').replace(/\s+/g,'-')}.pdf`,
     image:    { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 3, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' },
-    jsPDF:    { unit: 'mm', format: 'a5', orientation: 'landscape' },
+    jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
   }).from(el).save();
 }
 
