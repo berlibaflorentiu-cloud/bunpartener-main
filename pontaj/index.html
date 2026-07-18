@@ -791,6 +791,12 @@
     #bon-document .bon-sign-block { flex: 1; text-align: center; }
     #bon-document .bon-sign-line { border-bottom: 1px solid #111; height: 34px; }
     #bon-document .bon-sign-label { font-size: 9px; color: #444; margin-top: 4px; }
+    /* BuNPartener's own stamp + cashier signature are pre-filled so the firm
+       doesn't have to wet-sign/stamp every single printed receipt; only the
+       beneficiary's signature block stays genuinely blank. */
+    #bon-document .bon-sign-visual { position: relative; height: 60px; }
+    #bon-document .bon-stamp-img { position: absolute; left: 4px; bottom: -14px; height: 88px; width: auto; opacity: .9; }
+    #bon-document .bon-casier-sig-img { position: absolute; left: 86px; bottom: -2px; height: 52px; width: auto; }
     #bon-document .bon-footer-print { text-align: center; font-size: 7.5px; color: #555; margin-top: 14px; }
 
     /* ── ADMIN TABS ── */
@@ -4805,7 +4811,11 @@ function renderBonDocumentHTML(r) {
 
       <div class="bon-sign-row">
         <div class="bon-sign-block">
-          <div class="bon-sign-line"></div>
+          <div class="bon-sign-visual">
+            <img class="bon-stamp-img" data-asset="stamp-bunpartener.png" alt="">
+            <img class="bon-casier-sig-img" data-asset="semnatura-casier.png" alt="">
+            <div class="bon-sign-line"></div>
+          </div>
           <div class="bon-sign-label">Semnătura casierului<br>Подпись кассира</div>
         </div>
         <div class="bon-sign-block">
@@ -4819,7 +4829,21 @@ function renderBonDocumentHTML(r) {
   `;
 }
 
-function openBonPrintView(id) {
+// The BuNPartener stamp + cashier signature live in a private Supabase
+// Storage bucket (bon-assets, admin-only RLS) rather than as public files —
+// this project deploys via a public GitHub Pages repo, so anything checked
+// into it would be a permanently downloadable image of the firm's real seal
+// and a real signature. Signed URLs are fetched on demand and expire soon after.
+const _bonAssetUrlCache = {};
+async function getBonAssetUrl(path) {
+  if (_bonAssetUrlCache[path]) return _bonAssetUrlCache[path];
+  const { data, error } = await db.storage.from('bon-assets').createSignedUrl(path, 600);
+  if (error || !data) return null;
+  _bonAssetUrlCache[path] = data.signedUrl;
+  return data.signedUrl;
+}
+
+async function openBonPrintView(id) {
   const r = allReceipts.find(x => x.id === id);
   if (!r) return;
   document.getElementById('modal-title').textContent = `Bon ${r.serie_nr || ''}`;
@@ -4831,11 +4855,20 @@ function openBonPrintView(id) {
   document.getElementById('modal-body').innerHTML = renderBonDocumentHTML(r);
   document.querySelector('.modal')?.classList.add('modal-wide');
   document.getElementById('modal-overlay').style.display = 'flex';
+
+  document.querySelectorAll('#bon-document img[data-asset]').forEach(async img => {
+    const url = await getBonAssetUrl(img.dataset.asset);
+    if (url) img.src = url;
+  });
 }
 
-function downloadBonPDF(id) {
+async function downloadBonPDF(id) {
   const el = document.getElementById('bon-document');
   if (!el) return;
+  // Stamp/signature <img> src is set asynchronously (signed Storage URL) —
+  // wait for them so the PDF never captures a blank signature area.
+  const imgs = [...el.querySelectorAll('img[data-asset]')];
+  await Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(res => { img.onload = res; img.onerror = res; })));
   const r = allReceipts.find(x => x.id === id);
   html2pdf().set({
     margin: [10, 10, 10, 10],
