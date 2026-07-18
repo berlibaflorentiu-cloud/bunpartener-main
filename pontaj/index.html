@@ -4612,6 +4612,11 @@ function openBonModal(id) {
   const signers = (r.bon_signers && r.bon_signers.length) ? [...r.bon_signers] : ['BuNPartener'];
   _bonModalState = {
     receiptId: id,
+    receiptDate: r.date || todayStr(),
+    clientName: r.client_name || '',
+    personalCode: r.cod_personal || '',
+    baseAmount: Number(r.plata_baza) || 0,
+    compensation: Number(r.compensare) || 0,
     address: r.bon_address || '',
     contractDate,
     signers,
@@ -4629,7 +4634,7 @@ function renderBonModal() {
   const hasNumber = !!r.serie_nr;
   const batch = getActiveBonBatch();
   const previewNumber = hasNumber ? r.serie_nr : `${batch.seria}${batch.next_number}`;
-  const total = (Number(r.plata_baza)||0) + (Number(r.compensare)||0);
+  const total = (Number(s.baseAmount)||0) + (Number(s.compensation)||0);
 
   document.getElementById('modal-title').textContent = hasNumber ? 'Editează bonul' : 'Generează bon nou';
   document.getElementById('modal-actions').innerHTML = `<button class="btn-ghost" onclick="closeModal()">✕</button>`;
@@ -4641,14 +4646,39 @@ function renderBonModal() {
           : `Următorul număr disponibil: ${esc(previewNumber)} · rămân ${bonBatchRemaining(batch)-1} după acesta`}
       </div>
 
-      <div class="field">
-        <label>Client · Data · Sumă</label>
-        <div style="font-size:14px">${esc(r.client_name)} · ${fmtDate(r.date)} · ${fmtMoneyCents(total,'MDL')}</div>
+      <div style="padding:10px 12px;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:12px">
+        Câmpurile sunt așezate automat pe liniile formularului. Textul mai lung este micșorat sau împărțit pe rândurile disponibile.
+      </div>
+
+      <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(160px,1fr);gap:12px">
+        <div class="field">
+          <label>Numele beneficiarului</label>
+          <input type="text" id="bon-client-name" maxlength="100" value="${esc(s.clientName)}" oninput="_bonModalState.clientName=this.value">
+        </div>
+        <div class="field">
+          <label>Data bonului</label>
+          <input type="date" id="bon-receipt-date" value="${s.receiptDate||''}" onchange="_bonModalState.receiptDate=this.value">
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(140px,1fr) minmax(140px,1fr);gap:12px">
+        <div class="field">
+          <label>Codul personal / fiscal</label>
+          <input type="text" id="bon-personal-code" maxlength="30" value="${esc(s.personalCode)}" oninput="_bonModalState.personalCode=this.value">
+        </div>
+        <div class="field">
+          <label>Servicii, MDL</label>
+          <input type="number" id="bon-base-amount" min="0" step="0.01" value="${s.baseAmount}" oninput="_bonModalState.baseAmount=this.value">
+        </div>
+        <div class="field">
+          <label>Compensare, MDL</label>
+          <input type="number" id="bon-compensation" min="0" step="0.01" value="${s.compensation}" oninput="_bonModalState.compensation=this.value">
+        </div>
       </div>
 
       <div class="field">
         <label>Adresa beneficiarului</label>
-        <input type="text" id="bon-address" placeholder="ex. or. Chișinău, str. ..., nr. ..." value="${esc(s.address)}" oninput="_bonModalState.address=this.value">
+        <input type="text" id="bon-address" maxlength="120" placeholder="opțional · ex. or. Chișinău, str. ..., nr. ..." value="${esc(s.address)}" oninput="_bonModalState.address=this.value">
       </div>
 
       <div class="field">
@@ -4674,7 +4704,7 @@ function renderBonModal() {
         <label>Descrierea serviciului (pe bon)
           <button type="button" onclick="_bonRegenDescription()" style="background:none;border:none;color:var(--gold);font-size:11px;cursor:pointer;padding:0;margin-left:8px;text-transform:none;letter-spacing:0">↻ regenerează din datele de mai sus</button>
         </label>
-        <textarea id="bon-description" rows="3" style="width:100%;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;padding:9px 12px" oninput="_bonModalState.description=this.value">${esc(s.description)}</textarea>
+        <textarea id="bon-description" maxlength="300" rows="3" style="width:100%;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;padding:9px 12px" oninput="_bonModalState.description=this.value">${esc(s.description)}</textarea>
       </div>
 
       <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--border)">
@@ -4709,8 +4739,19 @@ async function confirmBon(id) {
   const s = _bonModalState;
   const r = allReceipts.find(x => x.id === id);
   if (!r || !s) return;
+  const receiptDate = document.getElementById('bon-receipt-date')?.value || '';
+  const clientName = (document.getElementById('bon-client-name')?.value || '').trim();
+  const personalCode = (document.getElementById('bon-personal-code')?.value || '').trim();
+  const baseAmount = Number(document.getElementById('bon-base-amount')?.value || 0);
+  const compensation = Number(document.getElementById('bon-compensation')?.value || 0);
   const address = (document.getElementById('bon-address')?.value || '').trim();
   const description = (document.getElementById('bon-description')?.value || '').trim();
+  if (!receiptDate) { alert('Completează data bonului.'); return; }
+  if (!clientName) { alert('Completează numele beneficiarului.'); return; }
+  if (!Number.isFinite(baseAmount) || baseAmount < 0 || !Number.isFinite(compensation) || compensation < 0 || baseAmount + compensation <= 0) {
+    alert('Completează o sumă validă mai mare decât zero.');
+    return;
+  }
   if (!description) { alert('Completează descrierea serviciului.'); return; }
 
   const hasNumber = !!r.serie_nr;
@@ -4738,6 +4779,11 @@ async function confirmBon(id) {
   }
 
   const updates = {
+    date: receiptDate,
+    client_name: clientName,
+    cod_personal: personalCode,
+    plata_baza: baseAmount,
+    compensare: compensation,
     bon_address: address,
     bon_signers: s.signers,
     bon_description: description,
@@ -4779,11 +4825,38 @@ function _bonCanvasText(ctx, text, x, y, font, align = 'left') {
   ctx.fillText(text || '', x, y);
 }
 
+function _bonCanvasTextFit(ctx, text, x, y, maxWidth, size, align = 'left', weight = '', family = 'Arial', minSize = 13) {
+  const value = String(text || '');
+  let fittedSize = size;
+  do {
+    ctx.font = `${weight ? `${weight} ` : ''}${fittedSize}px ${family}`;
+    if (ctx.measureText(value).width <= maxWidth) break;
+    fittedSize -= 1;
+  } while (fittedSize >= minSize);
+  ctx.font = `${weight ? `${weight} ` : ''}${Math.max(fittedSize, minSize)}px ${family}`;
+  ctx.fillStyle = '#050505';
+  ctx.textAlign = align;
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(value, x, y, maxWidth);
+}
+
 function _bonWrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 4) {
   const words = String(text || '').split(/\s+/).filter(Boolean);
   const lines = [];
   let line = '';
-  words.forEach(word => {
+  words.forEach(rawWord => {
+    let word = rawWord;
+    while (ctx.measureText(word).width > maxWidth && word.length > 1) {
+      let cut = word.length - 1;
+      while (cut > 1 && ctx.measureText(`${word.slice(0, cut)}-`).width > maxWidth) cut--;
+      const part = `${word.slice(0, cut)}-`;
+      if (line) {
+        lines.push(line);
+        line = '';
+      }
+      lines.push(part);
+      word = word.slice(cut);
+    }
     const test = line ? `${line} ${word}` : word;
     if (line && ctx.measureText(test).width > maxWidth) {
       lines.push(line);
@@ -4791,7 +4864,13 @@ function _bonWrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 4)
     } else line = test;
   });
   if (line) lines.push(line);
-  lines.slice(0, maxLines).forEach((value, i) => ctx.fillText(value, x, y + i * lineHeight));
+  const visible = lines.slice(0, maxLines);
+  if (lines.length > maxLines && visible.length) {
+    let last = visible[visible.length - 1];
+    while (last.length > 1 && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1);
+    visible[visible.length - 1] = `${last.trimEnd()}…`;
+  }
+  visible.forEach((value, i) => ctx.fillText(value, x, y + i * lineHeight));
 }
 
 async function renderBonScanToCanvas(r) {
@@ -4828,31 +4907,31 @@ async function renderBonScanToCanvas(r) {
       _bonCanvasText(ctx, 'экз. - клиенту', 181, 96, '16px "Times New Roman"');
     }
 
-    _bonCanvasText(ctx, seriesPart, 440, 129, '27px Arial');
-    _bonCanvasText(ctx, numberPart, 602, 129, '27px Arial');
-    _bonCanvasText(ctx, fmtDateLongRO(r.date), 214, 190, '27px Arial');
-    _bonCanvasText(ctx, BON_FIRM.name, 747, 239, '25px Arial', 'center');
-    _bonCanvasText(ctx, `or. ${BON_FIRM.address.replace(/^mun\.\s*/i, '')}`, 747, 292, '25px Arial', 'center');
-    _bonCanvasText(ctx, BON_FIRM.fiscalCode, 1260, 256, '24px Arial', 'center');
-    _bonCanvasText(ctx, r.client_name || '', 747, 350, '29px Arial', 'center');
-    _bonCanvasText(ctx, r.cod_personal || '', 1260, 369, '23px Arial', 'center');
-    _bonCanvasText(ctx, r.bon_address || '', 747, 401, '25px Arial', 'center');
+    _bonCanvasTextFit(ctx, seriesPart, 440, 129, 115, 27);
+    _bonCanvasTextFit(ctx, numberPart, 602, 129, 190, 27);
+    _bonCanvasTextFit(ctx, fmtDateLongRO(r.date), 214, 190, 280, 27);
+    _bonCanvasTextFit(ctx, BON_FIRM.name, 747, 239, 760, 25, 'center');
+    _bonCanvasTextFit(ctx, `or. ${BON_FIRM.address.replace(/^mun\.\s*/i, '')}`, 747, 292, 820, 25, 'center');
+    _bonCanvasTextFit(ctx, BON_FIRM.fiscalCode, 1260, 256, 230, 24, 'center');
+    _bonCanvasTextFit(ctx, r.client_name || '', 747, 350, 820, 29, 'center');
+    _bonCanvasTextFit(ctx, r.cod_personal || '', 1260, 369, 230, 23, 'center');
+    _bonCanvasTextFit(ctx, r.bon_address || '', 747, 401, 820, 25, 'center');
 
     ctx.font = '25px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#050505';
     _bonWrapCanvasText(ctx, r.bon_description || '', 146, 552, 480, 44, 4);
     _bonCanvasText(ctx, 'serv.', 676, 552, '23px Arial', 'center');
     _bonCanvasText(ctx, 'unit.', 761, 552, '25px Arial', 'center');
     if (Number(r.plata_baza) > 0) {
-      _bonCanvasText(ctx, money(r.plata_baza), 931, 552, '26px Arial', 'right');
-      _bonCanvasText(ctx, money(r.plata_baza), 1315, 552, '24px Arial', 'center');
+      _bonCanvasTextFit(ctx, money(r.plata_baza), 931, 552, 145, 26, 'right');
+      _bonCanvasTextFit(ctx, money(r.plata_baza), 1315, 552, 150, 24, 'center');
     }
     if (Number(r.compensare) > 0) {
       _bonCanvasText(ctx, 'Compensare cheltuieli', 146, 596, '23px Arial');
-      _bonCanvasText(ctx, money(r.compensare), 931, 596, '25px Arial', 'right');
-      _bonCanvasText(ctx, money(r.compensare), 1315, 596, '24px Arial', 'center');
+      _bonCanvasTextFit(ctx, money(r.compensare), 931, 596, 145, 25, 'right');
+      _bonCanvasTextFit(ctx, money(r.compensare), 1315, 596, 150, 24, 'center');
     }
-    _bonCanvasText(ctx, money(total), 1315, 810, '24px Arial', 'center');
-    _bonCanvasText(ctx, amountToWordsRO(total), 956, 850, '26px Arial', 'center');
+    _bonCanvasTextFit(ctx, money(total), 1315, 810, 150, 24, 'center');
+    _bonCanvasTextFit(ctx, amountToWordsRO(total), 956, 850, 1050, 26, 'center');
 
     // Copy 3 is otherwise clean but omits the firm's signature block found on
     // copies 1 and 2. Restore it identically on both generated copies.
