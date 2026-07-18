@@ -696,6 +696,7 @@
       overflow-y: auto;
       position: relative;
     }
+    .modal.modal-wide { max-width: 980px; }
     .modal-head {
       display: flex;
       align-items: center;
@@ -753,6 +754,44 @@
       font-size: 9pt;
       line-height: 1.15;
     }
+
+    /* ── BON DE PLATĂ (printable receipt, Registru → Bonuri) ── */
+    #bon-document {
+      background: #fff;
+      color: #111;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      line-height: 1.35;
+      border: 1.5px solid #111;
+      padding: 16px 18px;
+    }
+    #bon-document .bon-formular-tip {
+      text-align: right;
+      font-size: 9px;
+      line-height: 1.3;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    #bon-document .bon-head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 10px; }
+    #bon-document .bon-title { font-size: 17px; font-weight: 700; }
+    #bon-document .bon-title-sub { font-size: 9px; color: #444; font-style: italic; }
+    #bon-document .bon-seria-nr { font-size: 14px; margin-top: 4px; }
+    #bon-document .bon-field-row { display: flex; gap: 10px; border-bottom: 1px solid #111; padding: 5px 0; align-items: flex-start; }
+    #bon-document .bon-field-label { font-size: 9px; color: #444; width: 150px; flex-shrink: 0; line-height: 1.25; }
+    #bon-document .bon-field-value { flex: 1; font-size: 13px; text-align: center; }
+    #bon-document .bon-field-code { border: 1px solid #111; padding: 3px 10px; font-size: 12px; white-space: nowrap; }
+    #bon-document table.bon-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 10.5px; }
+    #bon-document table.bon-table th, #bon-document table.bon-table td { border: 1px solid #111; padding: 5px 6px; vertical-align: top; }
+    #bon-document table.bon-table th { font-size: 8.5px; font-weight: 500; color: #333; text-align: center; }
+    #bon-document table.bon-table td.bon-desc-cell { text-align: left; }
+    #bon-document table.bon-table td.bon-num-cell { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    #bon-document .bon-total-words { display: flex; align-items: baseline; gap: 10px; margin-top: 10px; font-size: 12px; }
+    #bon-document .bon-total-words strong { font-size: 13px; }
+    #bon-document .bon-sign-row { display: flex; justify-content: space-between; margin-top: 28px; gap: 24px; }
+    #bon-document .bon-sign-block { flex: 1; text-align: center; }
+    #bon-document .bon-sign-line { border-bottom: 1px solid #111; height: 34px; }
+    #bon-document .bon-sign-label { font-size: 9px; color: #444; margin-top: 4px; }
+    #bon-document .bon-footer-print { text-align: center; font-size: 7.5px; color: #555; margin-top: 14px; }
 
     /* ── ADMIN TABS ── */
     .admin-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:24px; overflow-x:auto; scrollbar-width:none; }
@@ -1040,6 +1079,7 @@
       <span class="header-user" id="headerUser"></span>
       <span id="header-mode-toggle"></span>
       <span id="header-requests"></span>
+      <span id="header-bonuri"></span>
       <button class="btn-ghost btn-logout" onclick="logout()" aria-label="Deconectare" title="Deconectare">
         <svg class="ico-logout" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         <span class="logout-text">Deconectare</span>
@@ -1121,6 +1161,7 @@ let allClientReports  = [];
 let _actFormState     = null;
 let allAtentii        = [];
 let allPersonalAtentii = [];
+let allBonBatches      = [];
 
 function initDateRange() {
   const now = new Date();
@@ -1131,7 +1172,7 @@ function initDateRange() {
   };
 }
 const _dr = initDateRange();
-const state = { dateStart: _dr.start, dateEnd: _dr.end, filterUser: 'all', viewMode: 'admin', customGroup: [], adminTab: 'pontaj', clientiSearch: '', clientiStatus: 'all', registruSearch: '', registruDateStart: null, registruDateEnd: null, registruPreset: 'all', pontajPage: 1, registruPage: 1, avocatTab: 'pontaj', activePreset: '30d', siteStatsDays: 30 };
+const state = { dateStart: _dr.start, dateEnd: _dr.end, filterUser: 'all', viewMode: 'admin', customGroup: [], adminTab: 'pontaj', clientiSearch: '', clientiStatus: 'all', registruSearch: '', registruDateStart: null, registruDateEnd: null, registruPreset: 'all', bonuriSearch: '', bonuriFilter: 'all', pontajPage: 1, registruPage: 1, bonuriPage: 1, avocatTab: 'pontaj', activePreset: '30d', siteStatsDays: 30 };
 const PAGE_SIZE = 30;
 function isAdmin(u) { return u?.role === 'admin' || u?.role === 'owner'; }
 
@@ -1307,18 +1348,20 @@ async function fetchAndShow(userId) {
 
     if (isAdmin(currentUser)) {
       try {
-        const [cRes, iRes, ieRes, rRes, crRes] = await dbTimeout(Promise.all([
+        const [cRes, iRes, ieRes, rRes, crRes, bbRes] = await dbTimeout(Promise.all([
           db.from('clients').select('*').order('name'),
           db.from('invoices').select('*').order('created_at', { ascending: false }),
           db.from('invoice_entries').select('*'),
           db.from('receipts').select('*').order('date', { ascending: false }),
           db.from('client_reports').select('*').order('created_at', { ascending: false }),
+          db.from('bon_batches').select('*').order('created_at', { ascending: false }),
         ]));
         allClients        = cRes.data  || [];
         allInvoices       = iRes.data  || [];
         allInvoiceEntries = ieRes.data || [];
         allReceipts       = rRes.data  || [];
         allClientReports  = crRes.data || [];
+        allBonBatches     = bbRes.data || [];
       } catch(e) { /* tables not yet created — graceful degradation */ }
       // isolated from the batch above — a failure here must never block
       // client/invoice data (which the client-name autocomplete depends on)
@@ -1359,17 +1402,19 @@ async function refreshInBackground(userId) {
 
     if (isAdmin(currentUser)) {
       try {
-        const [cRes, iRes, ieRes, rRes, crRes] = await Promise.all([
+        const [cRes, iRes, ieRes, rRes, crRes, bbRes] = await Promise.all([
           db.from('clients').select('*').order('name'),
           db.from('invoices').select('*').order('created_at', { ascending: false }),
           db.from('invoice_entries').select('*'),
           db.from('receipts').select('*').order('date', { ascending: false }),
           db.from('client_reports').select('*').order('created_at', { ascending: false }),
+          db.from('bon_batches').select('*').order('created_at', { ascending: false }),
         ]);
         allClients        = cRes.data  || [];
         allInvoices       = iRes.data  || [];
         allInvoiceEntries = ieRes.data || [];
         allReceipts       = rRes.data  || [];
+        allBonBatches     = bbRes.data || [];
         allClientReports  = crRes.data || [];
       } catch(e) { /* tables not yet created */ }
       // isolated from the batch above — a failure here must never block
@@ -1382,6 +1427,7 @@ async function refreshInBackground(userId) {
     }
 
     updateRequestsBadge();
+    updateBonuriBadge();
     render(); // Re-render silently with fresh data
   } catch (e) {
     // Silent — cached data already showing
@@ -1417,6 +1463,7 @@ function showApp() {
   document.getElementById('headerUser').textContent = currentUser.name;
   updateModeToggle();
   updateRequestsBadge();
+  updateBonuriBadge();
   _refreshClientDatalist();
   render();
 }
@@ -1588,6 +1635,73 @@ function fmtSplitCents(mdl, eur) {
   if (mdl > 0) parts.push(fmtMoneyCents(mdl, 'MDL'));
   if (eur > 0) parts.push(fmtMoneyCents(eur, 'EUR'));
   return parts.join(' + ') || fmtMoneyCents(0, 'MDL');
+}
+
+// ═══════════════════════════════════════
+// ROMANIAN NUMBER-TO-WORDS (Bonuri "sumă în litere")
+// ═══════════════════════════════════════
+
+// n is 0-999.
+function _threeDigitToWordsRO(n) {
+  if (n === 0) return '';
+  const ones = ['', 'unu','doi','trei','patru','cinci','șase','șapte','opt','nouă'];
+  const teens = ['zece','unsprezece','doisprezece','treisprezece','paisprezece','cincisprezece','șaisprezece','șaptesprezece','optsprezece','nouăsprezece'];
+  const tens = ['', '', 'douăzeci','treizeci','patruzeci','cincizeci','șaizeci','șaptezeci','optzeci','nouăzeci'];
+  const hundreds = ['', 'o sută','două sute','trei sute','patru sute','cinci sute','șase sute','șapte sute','opt sute','nouă sute'];
+
+  const h = Math.floor(n / 100), r = n % 100;
+  let remainderStr = '';
+  if (r > 0) {
+    if (r < 10) remainderStr = ones[r];
+    else if (r < 20) remainderStr = teens[r - 10];
+    else {
+      const t = Math.floor(r / 10), o = r % 10;
+      remainderStr = o === 0 ? tens[t] : `${tens[t]} și ${ones[o]}`;
+    }
+  }
+  if (h && remainderStr) return `${hundreds[h]} ${remainderStr}`;
+  if (h) return hundreds[h];
+  return remainderStr;
+}
+
+// Whole non-negative integer → Romanian cardinal words, e.g. 13000 → "treisprezece mii".
+// "mii"/"milioane"/"miliarde" are grammatically feminine (or neuter-as-feminine
+// in plural), so a trailing "doi"/"unu" before them must become "două"/"una".
+function _feminizeTrailing(words) {
+  return words.replace(/\bdoi$/, 'două').replace(/\bunu$/, 'una');
+}
+
+function numberToWordsRO(n) {
+  n = Math.floor(n);
+  if (n === 0) return 'zero';
+  const groups = [];
+  let remaining = n;
+  while (remaining > 0) { groups.unshift(remaining % 1000); remaining = Math.floor(remaining / 1000); }
+  const totalGroups = groups.length;
+  const parts = [];
+  const scaleWord = { 1: 'mii', 2: 'milioane', 3: 'miliarde' };
+  const scaleOne  = { 1: 'o mie', 2: 'un milion', 3: 'un miliard' };
+  groups.forEach((g, idx) => {
+    if (g === 0) return;
+    const scale = totalGroups - 1 - idx; // 0=units, 1=thousands, 2=millions, 3=billions
+    if (scale === 0) { parts.push(_threeDigitToWordsRO(g)); return; }
+    if (g === 1) { parts.push(scaleOne[scale]); return; }
+    const words = _feminizeTrailing(_threeDigitToWordsRO(g));
+    // "de" is inserted before mii/milioane/miliarde once the multiplier is
+    // 20 or above (e.g. "douăzeci de mii"), but not for 2-19 ("cinci mii").
+    parts.push(g >= 20 ? `${words} de ${scaleWord[scale]}` : `${words} ${scaleWord[scale]}`);
+  });
+  return parts.join(' ');
+}
+
+// Amount → "<lei în litere> lei, XX bani", matching the wording on the
+// official Bon de plată form. No conversion — currency label is always MDL
+// since Bonuri only applies to lei entries.
+function amountToWordsRO(amount) {
+  const cents = Math.round((Number(amount) || 0) * 100);
+  const lei = Math.floor(cents / 100);
+  const bani = cents % 100;
+  return `${numberToWordsRO(lei)} lei, ${String(bani).padStart(2, '0')} bani`;
 }
 
 // Split earnings into EUR (hourly) and MDL (fixed-price), then format.
@@ -2428,6 +2542,7 @@ function renderAdmin() {
     clienti:   '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
     facturi:   '<path d="M6 2h9l4 4v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M14 2v5h5"/><line x1="8" y1="12" x2="15" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/>',
     registru:  '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+    bonuri:    '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h4"/>',
     site:      '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
     atentie:   '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
     personal:  '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
@@ -2438,6 +2553,7 @@ function renderAdmin() {
     { key: 'clienti',   label: 'Clienți' },
     { key: 'facturi',   label: 'Facturi' },
     { key: 'registru',  label: 'Registru' },
+    { key: 'bonuri',    label: 'Bonuri' },
     { key: 'site',      label: 'Site' },
     { key: 'atentie',   label: 'Atenție' },
     { key: 'personal',  label: 'Personal' },
@@ -2469,6 +2585,7 @@ function renderAdminTabContent() {
   else if (state.adminTab === 'clienti')   renderClienti(el);
   else if (state.adminTab === 'facturi')   renderFacturi(el);
   else if (state.adminTab === 'registru')  renderRegistru(el);
+  else if (state.adminTab === 'bonuri')    renderBonuri(el);
   else if (state.adminTab === 'site')      renderSiteStats(el);
   else if (state.adminTab === 'atentie')   renderAtentie(el);
   else if (state.adminTab === 'personal')  renderPersonalAtentii(el);
@@ -4240,6 +4357,509 @@ function exportRegistruCSV() {
   saveAs(blob, `Registru-${todayStr()}.csv`);
 }
 
+// ═══════════════════════════════════════
+// BONURI — official "Bon de plată" cash-receipt forms, one per Registru
+// entry (MDL only). Numbers come from batches the government issues in
+// blocks; each Bon consumes the next number from the active batch via the
+// consume_bon_number() RPC so two receipts can never end up with the same
+// government-issued number.
+// ═══════════════════════════════════════
+
+const BON_FIRM = {
+  name: 'BAA „Berliba și Partenerii” (BuNPartener)',
+  fiscalCode: '44421021',
+  address: 'mun. Chișinău, com. Budești, str. Toamnei, nr. 3',
+};
+
+function getActiveBonBatch() {
+  // allBonBatches is fetched ordered by created_at desc — the most recent
+  // batch created is always the active one.
+  return allBonBatches.length ? allBonBatches[0] : null;
+}
+function bonBatchTotal(b)     { return b ? (b.end_number - b.start_number + 1) : 0; }
+function bonBatchUsed(b)      { return b ? (b.next_number - b.start_number) : 0; }
+function bonBatchRemaining(b) { return b ? (b.end_number - b.next_number + 1) : 0; }
+
+function fmtDateLongRO(dateStr) {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return `${d} ${MONTHS[m - 1].toLowerCase()} ${y}`;
+}
+
+function renderBonuri(container) {
+  const batch = getActiveBonBatch();
+  const remaining = bonBatchRemaining(batch);
+  const total = bonBatchTotal(batch);
+  const urgent = batch && remaining <= 5;
+  const low    = batch && remaining <= 10;
+
+  const mdlReceipts = allReceipts.filter(r => (r.currency || 'MDL') === 'MDL');
+  const q = (state.bonuriSearch || '').trim().toLowerCase();
+  const filterKey = state.bonuriFilter || 'all';
+  let list = [...mdlReceipts].sort((a,b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+  if (filterKey === 'pending') list = list.filter(r => !r.bon_generated_at);
+  else if (filterKey === 'done') list = list.filter(r => r.bon_generated_at);
+  if (q) list = list.filter(r =>
+    (r.client_name||'').toLowerCase().includes(q) ||
+    (r.serie_nr||'').toLowerCase().includes(q) ||
+    (r.contract_nr||'').toLowerCase().includes(q)
+  );
+
+  const { items: pageItems, page: bonuriPage, totalPages: bonuriTotalPages, start: bonuriStart } =
+    paginate(list, state.bonuriPage, PAGE_SIZE);
+
+  const pendingCount = mdlReceipts.filter(r => !r.bon_generated_at).length;
+  const doneCount    = mdlReceipts.filter(r => r.bon_generated_at).length;
+
+  container.innerHTML = `
+    <div class="add-form" style="margin-bottom:24px">
+      <div class="form-title">Serie de numere</div>
+      ${batch ? `
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:${low?'14px':'0'}">
+          <span class="reg-total-badge">Seria ${esc(batch.seria)} · ${batch.start_number}–${batch.end_number}</span>
+          <span class="reg-total-badge">Următorul: ${esc(batch.seria)}${batch.next_number > batch.end_number ? '—' : batch.next_number}</span>
+          <span class="reg-total-badge" style="${urgent ? 'color:#e05c5c;border-color:rgba(224,92,92,.4);background:rgba(224,92,92,.1)' : low ? 'color:#d9a441;border-color:rgba(217,164,65,.4);background:rgba(217,164,65,.1)' : ''}">
+            Rămase ${remaining} din ${total}
+          </span>
+        </div>
+        ${low ? `<div style="font-size:13px;color:${urgent?'#e05c5c':'#d9a441'};margin-bottom:14px">
+          ${urgent
+            ? `⚠ Doar ${remaining} numere rămase în seria curentă. Comandați o serie nouă de la organul guvernamental cât mai curând.`
+            : `Atenție: mai sunt doar ${remaining} numere disponibile în seria curentă. Este momentul să solicitați o serie nouă.`}
+        </div>` : ''}
+      ` : `<p style="font-size:13px;color:var(--muted);margin-bottom:14px">Nicio serie introdusă încă. Introduceți intervalul primit de la organul guvernamental pentru a putea genera bonuri.</p>`}
+
+      <div class="reg-form-grid" style="grid-template-columns:minmax(84px,110px) minmax(96px,140px) minmax(96px,140px) auto">
+        <div class="field">
+          <label>Seria</label>
+          <input type="text" id="bb-seria" value="DAA" maxlength="8" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Nr. Start</label>
+          <input type="number" id="bb-start" min="1" step="1" placeholder="ex. 68842300">
+        </div>
+        <div class="field">
+          <label>Nr. Sfârșit</label>
+          <input type="number" id="bb-end" min="1" step="1" placeholder="ex. 68842399">
+        </div>
+        <button class="btn-primary" onclick="addBonBatch()" style="height:40px;padding:0 16px;display:flex;align-items:center;justify-content:center;white-space:nowrap">Adaugă serie nouă</button>
+      </div>
+    </div>
+
+    ${mdlReceipts.length === 0 ? '' : `
+    <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+      <button onclick="setBonuriFilter('all')" style="padding:5px 12px;border-radius:20px;border:1px solid ${filterKey==='all'?'var(--gold)':'var(--border)'};background:${filterKey==='all'?'rgba(200,169,110,.13)':'transparent'};color:${filterKey==='all'?'var(--gold)':'var(--muted)'};font-size:12px;cursor:pointer;transition:all .15s">Toate (${mdlReceipts.length})</button>
+      <button onclick="setBonuriFilter('pending')" style="padding:5px 12px;border-radius:20px;border:1px solid ${filterKey==='pending'?'var(--gold)':'var(--border)'};background:${filterKey==='pending'?'rgba(200,169,110,.13)':'transparent'};color:${filterKey==='pending'?'var(--gold)':'var(--muted)'};font-size:12px;cursor:pointer;transition:all .15s">Fără bon (${pendingCount})</button>
+      <button onclick="setBonuriFilter('done')" style="padding:5px 12px;border-radius:20px;border:1px solid ${filterKey==='done'?'var(--gold)':'var(--border)'};background:${filterKey==='done'?'rgba(200,169,110,.13)':'transparent'};color:${filterKey==='done'?'var(--gold)':'var(--muted)'};font-size:12px;cursor:pointer;transition:all .15s">Generate (${doneCount})</button>
+    </div>
+    <div class="search-bar">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="bonuri-search" placeholder="Caută client, serie, contract..." value="${esc(state.bonuriSearch||'')}" oninput="searchBonuri(this)" autocomplete="off">
+      ${state.bonuriSearch ? `<button class="search-clear" onclick="clearBonuriSearch()" title="Șterge căutarea">✕</button>` : ''}
+    </div>`}
+
+    <div class="table-wrap">
+      <div class="table-header">
+        <span class="table-title">Bonuri (${list.length}${(q||filterKey!=='all') ? ` din ${mdlReceipts.length}` : ''})</span>
+        ${pagerBar(bonuriPage, bonuriTotalPages, 'setBonuriPage', 'top')}
+      </div>
+      ${mdlReceipts.length === 0
+        ? `<div class="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.3;margin-bottom:12px"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/></svg><p>Nicio încasare în MDL în registru încă.<br>Bonurile se generează pentru intrările din Registru.</p></div>`
+        : list.length === 0
+        ? `<div class="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.3;margin-bottom:12px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><p>Nicio înregistrare găsită pentru filtrele selectate.</p></div>`
+        : `<div class="reg-wrap"><table class="reg-table">
+            <thead><tr>
+              <th>Nr. Bon</th>
+              <th>Data</th>
+              <th>Client</th>
+              <th>Nr. Contract</th>
+              <th>Sumă</th>
+              <th>Status</th>
+              <th></th>
+            </tr></thead>
+            <tbody>
+              ${pageItems.map(r => {
+                const total = (Number(r.plata_baza)||0) + (Number(r.compensare)||0);
+                const done = !!r.bon_generated_at;
+                return `<tr>
+                  <td style="font-weight:600;font-size:13px">${esc(r.serie_nr) || '—'}</td>
+                  <td class="td-date">${fmtDate(r.date)}</td>
+                  <td>${esc(r.client_name)}</td>
+                  <td style="color:var(--muted);font-size:12px">${esc(r.contract_nr)||'—'}</td>
+                  <td class="reg-money">${fmtMoneyCents(total,'MDL')}</td>
+                  <td><span class="${done ? 'badge-da' : 'badge-nu'}">${done ? 'GENERAT' : 'DE GENERAT'}</span></td>
+                  <td class="td-del" style="white-space:nowrap">
+                    ${done
+                      ? `<button class="btn-ghost" style="font-size:12px;padding:6px 12px" onclick="openBonPrintView('${r.id}')">Vizualizează</button>
+                         <button class="btn-edit" title="Editează datele bonului" onclick="openBonModal('${r.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>`
+                      : `<button class="btn-primary" style="font-size:12px;padding:6px 14px" onclick="openBonModal('${r.id}')">Generează Bon</button>`
+                    }
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+          ${pagerBar(bonuriPage, bonuriTotalPages, 'setBonuriPage')}</div>`
+      }
+    </div>
+  `;
+}
+
+function setBonuriFilter(f) { state.bonuriFilter = f; state.bonuriPage = 1; renderAdminTabContent(); }
+function searchBonuri(inputEl) { state.bonuriSearch = inputEl.value; state.bonuriPage = 1; renderAdminTabContent(); }
+function clearBonuriSearch() { state.bonuriSearch = ''; state.bonuriPage = 1; renderAdminTabContent(); }
+function setBonuriPage(p) { state.bonuriPage = p; renderAdminTabContent(); }
+
+async function addBonBatch() {
+  const seria = (document.getElementById('bb-seria')?.value || '').trim().toUpperCase() || 'DAA';
+  const start = parseInt(document.getElementById('bb-start')?.value, 10);
+  const end   = parseInt(document.getElementById('bb-end')?.value, 10);
+  if (!start || !end || end < start) { alert('Introduceți un interval valid (Nr. Start ≤ Nr. Sfârșit).'); return; }
+  const count = end - start + 1;
+  if (!confirm(`Adaugi seria ${seria} ${start}–${end} (${count} numere)?\nAceasta devine seria activă pentru bonurile viitoare.`)) return;
+  const { data, error } = await db.from('bon_batches')
+    .insert([{ seria, start_number: start, end_number: end, next_number: start, created_by: currentUser.id }])
+    .select().single();
+  if (error) { alert(error.message); return; }
+  allBonBatches.unshift(data);
+  updateBonuriBadge();
+  renderAdminTabContent();
+}
+
+// ── Bon generate/edit modal ─────────────────────────────
+
+let _bonModalState = null;
+
+function _buildBonDescription(r, client, contractDate, signers) {
+  const contractNr = r.contract_nr || client?.notes || '';
+  const dateTxt = contractDate ? fmtDateLongRO(contractDate) : '';
+  const signedWith = (signers||[]).filter(Boolean)
+    .map(s => s === 'BuNPartener' ? 'BuNPartener' : `CA "${s}"`)
+    .join(' și ');
+  let desc = 'Servicii juridice';
+  if (contractNr) desc += ` conform contractului de asistență juridică nr. ${contractNr}`;
+  if (dateTxt) desc += ` din ${dateTxt}`;
+  if (signedWith) desc += `, semnat cu ${signedWith}`;
+  return desc;
+}
+
+function openBonModal(id) {
+  const r = allReceipts.find(x => x.id === id);
+  if (!r) return;
+  if ((r.currency || 'MDL') !== 'MDL') { alert('Bonurile se emit doar pentru încasările în MDL.'); return; }
+  const hasNumber = !!r.serie_nr;
+  const batch = getActiveBonBatch();
+  if (!hasNumber && (!batch || bonBatchRemaining(batch) <= 0)) {
+    alert('Nu există o serie activă cu numere disponibile. Introduceți o serie nouă mai întâi.');
+    return;
+  }
+  const client = allClients.find(c => receiptBelongsToClient(r, c));
+  const contractDate = r.bon_generated_at
+    ? (client?.contract_date || todayStr())
+    : (client?.contract_date || todayStr());
+  const signers = (r.bon_signers && r.bon_signers.length) ? [...r.bon_signers] : ['BuNPartener'];
+  _bonModalState = {
+    receiptId: id,
+    address: r.bon_address || '',
+    contractDate,
+    signers,
+    description: r.bon_description || _buildBonDescription(r, client, contractDate, signers),
+  };
+  document.querySelector('.modal')?.classList.remove('modal-wide');
+  renderBonModal();
+}
+
+function renderBonModal() {
+  const s = _bonModalState;
+  if (!s) return;
+  const r = allReceipts.find(x => x.id === s.receiptId);
+  if (!r) return;
+  const hasNumber = !!r.serie_nr;
+  const batch = getActiveBonBatch();
+  const previewNumber = hasNumber ? r.serie_nr : `${batch.seria}${batch.next_number}`;
+  const total = (Number(r.plata_baza)||0) + (Number(r.compensare)||0);
+
+  document.getElementById('modal-title').textContent = hasNumber ? 'Editează bonul' : 'Generează bon nou';
+  document.getElementById('modal-actions').innerHTML = `<button class="btn-ghost" onclick="closeModal()">✕</button>`;
+  document.getElementById('modal-body').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:18px;padding:4px 0">
+      <div class="reg-total-badge" style="align-self:flex-start;font-size:14px">
+        ${hasNumber
+          ? `Bon Nr. ${esc(previewNumber)}`
+          : `Următorul număr disponibil: ${esc(previewNumber)} · rămân ${bonBatchRemaining(batch)-1} după acesta`}
+      </div>
+
+      <div class="field">
+        <label>Client · Data · Sumă</label>
+        <div style="font-size:14px">${esc(r.client_name)} · ${fmtDate(r.date)} · ${fmtMoneyCents(total,'MDL')}</div>
+      </div>
+
+      <div class="field">
+        <label>Adresa beneficiarului</label>
+        <input type="text" id="bon-address" placeholder="ex. or. Chișinău, str. ..., nr. ..." value="${esc(s.address)}" oninput="_bonModalState.address=this.value">
+      </div>
+
+      <div class="field">
+        <label>Data contractului</label>
+        <input type="date" id="bon-contract-date" value="${s.contractDate||''}" max="${todayStr()}" onchange="_bonModalState.contractDate=this.value">
+      </div>
+
+      <div class="field">
+        <label>Semnat de</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+          ${s.signers.map((name,i) => `
+            <span class="preset-chip active" style="cursor:default;display:inline-flex;align-items:center;gap:6px">
+              ${esc(name)}${name === 'BuNPartener' ? '' : ` <button type="button" onclick="_bonRemoveSigner(${i})" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;font-size:13px;line-height:1">✕</button>`}
+            </span>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="bon-new-signer" placeholder='ex. OSOIAN Lilian' style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();_bonAddSigner();}">
+          <button class="btn-ghost" type="button" onclick="_bonAddSigner()">+ Adaugă</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Descrierea serviciului (pe bon)
+          <button type="button" onclick="_bonRegenDescription()" style="background:none;border:none;color:var(--gold);font-size:11px;cursor:pointer;padding:0;margin-left:8px;text-transform:none;letter-spacing:0">↻ regenerează din datele de mai sus</button>
+        </label>
+        <textarea id="bon-description" rows="3" style="width:100%;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;padding:9px 12px" oninput="_bonModalState.description=this.value">${esc(s.description)}</textarea>
+      </div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--border)">
+        <button class="btn-ghost" onclick="closeModal()">Anulează</button>
+        <button class="btn-primary" onclick="confirmBon('${r.id}')">${hasNumber ? 'Salvează bonul' : `Atribuie Nr. ${esc(previewNumber)} și generează`}</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function _bonAddSigner() {
+  const input = document.getElementById('bon-new-signer');
+  const name = (input?.value || '').trim();
+  if (!name) return;
+  _bonModalState.signers.push(name);
+  renderBonModal();
+}
+function _bonRemoveSigner(i) {
+  _bonModalState.signers.splice(i, 1);
+  renderBonModal();
+}
+function _bonRegenDescription() {
+  const s = _bonModalState;
+  const r = allReceipts.find(x => x.id === s.receiptId);
+  const client = allClients.find(c => receiptBelongsToClient(r, c));
+  s.description = _buildBonDescription(r, client, s.contractDate, s.signers);
+  renderBonModal();
+}
+
+async function confirmBon(id) {
+  const s = _bonModalState;
+  const r = allReceipts.find(x => x.id === id);
+  if (!r || !s) return;
+  const address = (document.getElementById('bon-address')?.value || '').trim();
+  const description = (document.getElementById('bon-description')?.value || '').trim();
+  if (!address) { alert('Completează adresa beneficiarului.'); return; }
+  if (!description) { alert('Completează descrierea serviciului.'); return; }
+
+  const hasNumber = !!r.serie_nr;
+  const btn = document.querySelector('.modal-body .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+
+  let serieNr = r.serie_nr;
+  let consumedBatchId = null;
+
+  if (!hasNumber) {
+    const batch = getActiveBonBatch();
+    if (!batch || bonBatchRemaining(batch) <= 0) {
+      alert('Nu mai sunt numere disponibile în seria activă.');
+      if (btn) { btn.disabled = false; btn.textContent = 'Atribuie și generează'; }
+      return;
+    }
+    const { data: consumedNumber, error: rpcErr } = await db.rpc('consume_bon_number', { p_batch_id: batch.id });
+    if (rpcErr) {
+      alert('Nu s-a putut atribui numărul: ' + rpcErr.message);
+      if (btn) { btn.disabled = false; btn.textContent = 'Atribuie și generează'; }
+      return;
+    }
+    serieNr = `${batch.seria}${consumedNumber}`;
+    consumedBatchId = batch.id;
+  }
+
+  const updates = {
+    bon_address: address,
+    bon_signers: s.signers,
+    bon_description: description,
+    bon_generated_at: r.bon_generated_at || new Date().toISOString(),
+    ...(hasNumber ? {} : { serie_nr: serieNr }),
+  };
+
+  const { error: rErr } = await db.from('receipts').update(updates).eq('id', id);
+  if (rErr) {
+    alert(`Numărul ${serieNr} a fost deja consumat din serie, dar bonul nu a putut fi salvat: ${rErr.message}. Notează manual acest număr ca folosit.`);
+    if (btn) { btn.disabled = false; btn.textContent = 'Atribuie și generează'; }
+    return;
+  }
+
+  if (consumedBatchId) {
+    allBonBatches = allBonBatches.map(b => b.id === consumedBatchId ? { ...b, next_number: b.next_number + 1 } : b);
+  }
+  allReceipts = allReceipts.map(x => x.id === id ? { ...x, ...updates } : x);
+  updateBonuriBadge();
+  closeModal();
+  openBonPrintView(id);
+}
+
+// ── Printable Bon document + PDF/print ──────────────────
+
+function renderBonDocumentHTML(r) {
+  const total = (Number(r.plata_baza)||0) + (Number(r.compensare)||0);
+  // serie_nr is stored as the letter series and number concatenated
+  // (e.g. "DAA76695045") — split it back apart for display.
+  const serieMatch = (r.serie_nr || '').match(/^([A-ZĂÂÎȘȚ]*)(\d*)$/i);
+  const seriaPart = serieMatch ? serieMatch[1] : '';
+  const numberPart = serieMatch ? serieMatch[2] : (r.serie_nr || '');
+  const rows = [];
+  if (Number(r.plata_baza) > 0) rows.push({ desc: r.bon_description || '', amount: Number(r.plata_baza) });
+  if (Number(r.compensare) > 0) rows.push({ desc: 'Compensare cheltuieli conform contractului menționat mai sus.', amount: Number(r.compensare) });
+  if (rows.length === 0) rows.push({ desc: r.bon_description || '', amount: 0 });
+
+  const blankRows = Math.max(0, 3 - rows.length);
+
+  return `
+    <div id="bon-document">
+      <div class="bon-formular-tip">
+        <div><strong>Formular tipizat</strong></div>
+        <div>Типовая форма</div>
+        <div style="margin-top:4px">Aprobat prin Ordinul comun al Departamentului Statisticii al Republicii Moldova<br>
+        și Ministerul Finanțelor al Republicii Moldova nr.24/36 din 25 martie 1998</div>
+        <div>Утверждена совместным приказом Департамента статистики и Министер-<br>ства финансов Республики Молдова № 24/36 от 25 марта 1998 г.</div>
+      </div>
+
+      <div class="bon-head-row">
+        <div>
+          <div class="bon-title">BON DE PLATĂ</div>
+          <div class="bon-title-sub">Квитанция</div>
+          <div class="bon-seria-nr">Seria ${esc(seriaPart)} &nbsp; Nr. ${esc(numberPart)}</div>
+        </div>
+      </div>
+      <div class="bon-field-row" style="border-top:1px solid #111">
+        <div class="bon-field-label">Data<br>Дата</div>
+        <div class="bon-field-value" style="text-align:left">${fmtDate(r.date)}</div>
+      </div>
+
+      <div class="bon-field-row">
+        <div class="bon-field-label">Denumirea întreprinderii<br>Наименование предприятия</div>
+        <div class="bon-field-value">
+          <div style="font-size:14px;font-weight:600">${esc(BON_FIRM.name)}</div>
+          <div style="font-size:10px;color:#333;margin-top:2px">adresa juridică: ${esc(BON_FIRM.address)}</div>
+        </div>
+        <div class="bon-field-code">Cod fiscal<br>${esc(BON_FIRM.fiscalCode)}</div>
+      </div>
+
+      <div class="bon-field-row">
+        <div class="bon-field-label">Denumirea beneficiarului<br>Наименование заказчика</div>
+        <div class="bon-field-value">
+          <div style="font-size:14px;font-weight:600">${esc(r.client_name)}</div>
+          <div style="font-size:10px;color:#333;margin-top:2px">${esc(r.bon_address||'')}</div>
+        </div>
+        <div class="bon-field-code">Cod fiscal<br>${esc(r.cod_personal||'—')}</div>
+      </div>
+
+      <table class="bon-table">
+        <thead>
+          <tr>
+            <th style="width:38%">Denumirea mărfii (lucrărilor, serviciilor)<br>Наименование товара (работ, услуг)</th>
+            <th>Unit. de măsură<br>Единица изм.</th>
+            <th>Cantitatea<br>Количество</th>
+            <th>Valoarea fără TVA, lei<br>Стоимость без НДС, леев</th>
+            <th>Suma TVA, lei<br>Сумма НДС, леев</th>
+            <th>Impozitul pe venit aferent serviciilor, lei<br>Подоходный налог с услуг, леев</th>
+            <th>Total de plată, lei<br>Общая сумма к оплате, леев</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(row => `
+            <tr>
+              <td class="bon-desc-cell">${esc(row.desc)}</td>
+              <td style="text-align:center">serv.</td>
+              <td style="text-align:center">unit.</td>
+              <td class="bon-num-cell">${row.amount > 0 ? row.amount.toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}</td>
+              <td></td>
+              <td></td>
+              <td class="bon-num-cell">${row.amount > 0 ? row.amount.toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}</td>
+            </tr>`).join('')}
+          ${Array.from({length: blankRows}).map(() => `
+            <tr><td class="bon-desc-cell">&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}
+          <tr>
+            <td colspan="6" style="text-align:right;font-weight:600">TOTAL</td>
+            <td class="bon-num-cell" style="font-weight:700">${total.toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="bon-total-words">
+        <span>Total încasat<br><span style="font-size:9px;color:#666">Получено всего</span></span>
+        <strong>${amountToWordsRO(total)}</strong>
+      </div>
+
+      <div class="bon-sign-row">
+        <div class="bon-sign-block">
+          <div class="bon-sign-line"></div>
+          <div class="bon-sign-label">Semnătura casierului<br>Подпись кассира</div>
+        </div>
+        <div class="bon-sign-block">
+          <div class="bon-sign-line"></div>
+          <div class="bon-sign-label">Semnătura beneficiarului<br>Подпись заказчика</div>
+        </div>
+      </div>
+
+      <div class="bon-footer-print">Editura de Imprimate „Statistica”, a5 (355n), 11.02. t.5000×50×2</div>
+    </div>
+  `;
+}
+
+function openBonPrintView(id) {
+  const r = allReceipts.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('modal-title').textContent = `Bon ${r.serie_nr || ''}`;
+  document.getElementById('modal-actions').innerHTML = `
+    <button class="btn-ghost" onclick="downloadBonPDF('${r.id}')">Descarcă PDF</button>
+    <button class="btn-ghost" onclick="window.print()">Tipărește</button>
+    <button class="btn-ghost" onclick="closeModal()">✕</button>
+  `;
+  document.getElementById('modal-body').innerHTML = renderBonDocumentHTML(r);
+  document.querySelector('.modal')?.classList.add('modal-wide');
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function downloadBonPDF(id) {
+  const el = document.getElementById('bon-document');
+  if (!el) return;
+  const r = allReceipts.find(x => x.id === id);
+  html2pdf().set({
+    margin: [10, 10, 10, 10],
+    filename: `bon-${(r?.serie_nr || 'plata').replace(/\s+/g,'-')}.pdf`,
+    image:    { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' },
+    jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
+  }).from(el).save();
+}
+
+// ── Header low-batch notification (mirrors updateRequestsBadge) ──
+
+function updateBonuriBadge() {
+  const el = document.getElementById('header-bonuri');
+  if (!el || !isAdmin(currentUser)) { if (el) el.innerHTML = ''; return; }
+  const batch = getActiveBonBatch();
+  const remaining = bonBatchRemaining(batch);
+  if (!batch || remaining > 10) { el.innerHTML = ''; return; }
+  const urgent = remaining <= 5;
+  el.innerHTML = `<button class="btn-ghost" onclick="setAdminTab('bonuri')" style="border-color:${urgent?'#e05c5c':'#d9a441'};color:${urgent?'#e05c5c':'#d9a441'}" title="Numere rămase în seria de bonuri">
+    Bonuri: ${remaining} rămase
+  </button>`;
+}
+
 async function saveInvoice(editId) {
   const number     = document.getElementById('inv-number')?.value.trim();
   const clientName = document.getElementById('inv-client')?.value.trim() || null;
@@ -5303,7 +5923,12 @@ async function saveClientReportEdit(id) {
   if (_clientModalId) showClientReceipts(_clientModalId);
 }
 
-function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; _invEditId = null; }
+function closeModal() {
+  document.getElementById('modal-overlay').style.display = 'none';
+  document.querySelector('.modal')?.classList.remove('modal-wide');
+  _invEditId = null;
+  _bonModalState = null;
+}
 function handleOverlayClick(e) { if (e.target === document.getElementById('modal-overlay')) closeModal(); }
 
 // ═══════════════════════════════════════
