@@ -791,8 +791,16 @@
     .badge-nu { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; background: rgba(139,148,158,0.1); color: var(--muted); border: 1px solid var(--border); cursor: pointer; transition: all .15s; white-space: nowrap; user-select: none; }
     .badge-da:hover { background: rgba(63,185,80,0.25); }
     .badge-nu:hover { border-color: var(--muted); color: var(--text); }
-    .reg-form-grid { display: grid; grid-template-columns: 110px 120px 1fr 120px 140px 100px 100px; gap: 10px; align-items: end; }
+    .reg-form-grid { display: grid; grid-template-columns: 110px 120px 1fr 120px 140px 100px 100px 128px auto; gap: 10px; align-items: end; }
     @media (max-width: 900px) { .reg-form-grid { grid-template-columns: 1fr 1fr; } .reg-form-grid > * { grid-column: span 1; } .reg-form-grid .btn-primary { grid-column: span 2; } }
+
+    /* Currency toggle sized to sit flush with a .field input (Registru add-form) */
+    .toggle-group.reg { padding: 3px; box-sizing: border-box; }
+    .toggle-group.reg .toggle-btn { flex: 1; padding: 8px 0; font-size: 13px; text-align: center; }
+
+    /* Currency toggle sized for an inline table-cell edit (Registru row edit) */
+    .toggle-group.regcell { border-color: var(--gold); padding: 2px; margin-top: 5px; width: 72px; box-sizing: border-box; }
+    .toggle-group.regcell .toggle-btn { flex: 1; padding: 3px 0; font-size: 10px; }
 
     /* ── INVOICES ── */
     .invoice-list { display:flex; flex-direction:column; gap:10px; padding:12px; }
@@ -3940,7 +3948,7 @@ function renderRegistru(container) {
         </div>
         <div class="field">
           <label>Monedă</label>
-          <div id="rg-currency-toggle">${currencyToggleHtml('MDL', "setRgCurrency('MDL')", "setRgCurrency('EUR')")}</div>
+          <div id="rg-currency-toggle">${currencyToggleHtml('MDL', "setRgCurrency('MDL')", "setRgCurrency('EUR')", 'reg')}</div>
           <input type="hidden" id="rg-currency" value="MDL">
         </div>
         <button class="btn-primary" onclick="addReceipt()" style="padding:9px 22px">Adaugă</button>
@@ -4089,7 +4097,7 @@ function editReceipt(id) {
   cells[5].innerHTML = `<input class="tei" type="text" value="${esc(r.contract_nr||'')}" data-f="contract_nr" style="width:120px">`;
   cells[6].innerHTML = `
     <input class="tei" type="number" value="${r.plata_baza}" data-f="plata_baza" min="0" step="0.01" style="width:90px">
-    <div id="edit-currency-${id}" style="margin-top:4px">${currencyToggleHtml(row.dataset.currency, `setEditCurrency('${id}','MDL')`, `setEditCurrency('${id}','EUR')`)}</div>`;
+    <div id="edit-currency-${id}">${currencyToggleHtml(row.dataset.currency, `setEditCurrency('${id}','MDL')`, `setEditCurrency('${id}','EUR')`, 'regcell')}</div>`;
   cells[7].innerHTML = `<input class="tei" type="number" value="${r.compensare}" data-f="compensare" min="0" step="0.01" style="width:90px">`;
   cells[8].textContent = '—';
   cells[11].innerHTML = `
@@ -4467,9 +4475,9 @@ function proceedToPricing() {
 // Everything else (Întrevederea la Penitenciar, cheltuieli, etc.) stays MDL-only.
 const CURRENCY_TOGGLE_LABELS = ['Ședința de judecată', 'Acțiunea de urmărire penală'];
 
-function currencyToggleHtml(current, onMdl, onEur) {
+function currencyToggleHtml(current, onMdl, onEur, size = 'sm') {
   return `
-    <div class="toggle-group sm" role="group" aria-label="Monedă">
+    <div class="toggle-group ${size}" role="group" aria-label="Monedă">
       <button type="button" class="toggle-btn${current === 'MDL' ? ' active' : ''}" onclick="${onMdl}">MDL</button>
       <button type="button" class="toggle-btn${current === 'EUR' ? ' active' : ''}" onclick="${onEur}">EUR</button>
     </div>`;
