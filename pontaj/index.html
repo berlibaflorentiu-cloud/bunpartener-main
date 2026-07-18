@@ -4838,18 +4838,18 @@ async function renderBonScanToCanvas(r) {
 
     ctx.font = '25px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#050505';
     _bonWrapCanvasText(ctx, r.bon_description || '', 146, 552, 480, 44, 4);
-    _bonCanvasText(ctx, 'serv.', 657, 552, '25px Arial', 'center');
+    _bonCanvasText(ctx, 'serv.', 676, 552, '23px Arial', 'center');
     _bonCanvasText(ctx, 'unit.', 761, 552, '25px Arial', 'center');
     if (Number(r.plata_baza) > 0) {
       _bonCanvasText(ctx, money(r.plata_baza), 931, 552, '26px Arial', 'right');
-      _bonCanvasText(ctx, money(r.plata_baza), 1362, 552, '26px Arial', 'right');
+      _bonCanvasText(ctx, money(r.plata_baza), 1315, 552, '24px Arial', 'center');
     }
     if (Number(r.compensare) > 0) {
       _bonCanvasText(ctx, 'Compensare cheltuieli', 146, 596, '23px Arial');
       _bonCanvasText(ctx, money(r.compensare), 931, 596, '25px Arial', 'right');
-      _bonCanvasText(ctx, money(r.compensare), 1362, 596, '25px Arial', 'right');
+      _bonCanvasText(ctx, money(r.compensare), 1315, 596, '24px Arial', 'center');
     }
-    _bonCanvasText(ctx, money(total), 1362, 810, '26px Arial', 'right');
+    _bonCanvasText(ctx, money(total), 1315, 810, '24px Arial', 'center');
     _bonCanvasText(ctx, amountToWordsRO(total), 956, 850, '26px Arial', 'center');
 
     // Copy 3 is otherwise clean but omits the firm's signature block found on
