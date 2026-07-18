@@ -1560,8 +1560,19 @@ function fmtMoney(n) {
 
 // Same as fmtMoney but keeps cents — used for Registru (receipts), where
 // sums are entered to the ban and shouldn't round away on display.
-function fmtMoneyCents(n) {
-  return n.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' MDL';
+// cur is a display label only — no conversion is ever applied to n.
+function fmtMoneyCents(n, cur = 'MDL') {
+  return n.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + cur;
+}
+
+// Registru totals span receipts entered in different currencies; since
+// amounts are never converted, MDL and EUR are summed separately and
+// shown side by side (same idea as fmtEarnings for the dashboard).
+function fmtSplitCents(mdl, eur) {
+  const parts = [];
+  if (mdl > 0) parts.push(fmtMoneyCents(mdl, 'MDL'));
+  if (eur > 0) parts.push(fmtMoneyCents(eur, 'EUR'));
+  return parts.join(' + ') || fmtMoneyCents(0, 'MDL');
 }
 
 // Split earnings into EUR (hourly) and MDL (fixed-price), then format.
@@ -3920,12 +3931,17 @@ function renderRegistru(container) {
           <input type="text" id="rg-contract" placeholder="ex. VB-17.285/03-24" autocomplete="off" oninput="contractAcInput(this)" onkeydown="clientAcKeydown(event)" onblur="setTimeout(closeClientAc,200)">
         </div>
         <div class="field">
-          <label>Plată de bază (MDL)</label>
+          <label>Plată de bază</label>
           <input type="number" id="rg-baza" min="0" step="0.01" placeholder="0.00">
         </div>
         <div class="field">
           <label>Compensare cheltuieli</label>
           <input type="number" id="rg-comp" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="field">
+          <label>Monedă</label>
+          <div id="rg-currency-toggle">${currencyToggleHtml('MDL', "setRgCurrency('MDL')", "setRgCurrency('EUR')")}</div>
+          <input type="hidden" id="rg-currency" value="MDL">
         </div>
         <button class="btn-primary" onclick="addReceipt()" style="padding:9px 22px">Adaugă</button>
       </div>
@@ -3942,7 +3958,10 @@ function renderRegistru(container) {
       <div class="table-header">
         <div style="display:flex;align-items:center;gap:12px">
           <span class="table-title">Registru chitanțe (${sorted.length}${q ? ` din ${all.length}` : ''})</span>
-          ${sorted.length ? `<span class="reg-total-badge">Total plată de bază: ${fmtMoneyCents(sorted.reduce((s,r) => s + (Number(r.plata_baza)||0), 0))}</span>` : ''}
+          ${sorted.length ? `<span class="reg-total-badge">Total plată de bază: ${fmtSplitCents(
+            sorted.filter(r => (r.currency||'MDL') === 'MDL').reduce((s,r) => s + (Number(r.plata_baza)||0), 0),
+            sorted.filter(r => r.currency === 'EUR').reduce((s,r) => s + (Number(r.plata_baza)||0), 0)
+          )}</span>` : ''}
         </div>
         <div style="display:flex;align-items:center;gap:16px">
           ${pagerBar(registruPage, registruTotalPages, 'setRegistruPage', 'top')}
@@ -3979,6 +3998,7 @@ function renderRegistru(container) {
 }
 
 function _regRow(r, nr) {
+  const cur = r.currency || 'MDL';
   const total = (Number(r.plata_baza)||0) + (Number(r.compensare)||0);
   return `
     <tr data-receipt-id="${r.id}">
@@ -3988,9 +4008,9 @@ function _regRow(r, nr) {
       <td>${esc(r.client_name)}</td>
       <td style="color:var(--muted);font-size:12px">${esc(r.cod_personal)||'—'}</td>
       <td style="color:var(--muted);font-size:12px">${esc(r.contract_nr)||'—'}</td>
-      <td class="reg-money">${r.plata_baza > 0 ? fmtMoneyCents(Number(r.plata_baza)) : '—'}</td>
-      <td class="reg-money">${r.compensare > 0 ? fmtMoneyCents(Number(r.compensare)) : '—'}</td>
-      <td class="reg-total">${total > 0 ? fmtMoneyCents(total) : '—'}</td>
+      <td class="reg-money">${r.plata_baza > 0 ? fmtMoneyCents(Number(r.plata_baza), cur) : '—'}</td>
+      <td class="reg-money">${r.compensare > 0 ? fmtMoneyCents(Number(r.compensare), cur) : '—'}</td>
+      <td class="reg-total">${total > 0 ? fmtMoneyCents(total, cur) : '—'}</td>
       <td style="text-align:center">
         <span class="${r.semnat ? 'badge-da' : 'badge-nu'}" onclick="toggleReceiptField('${r.id}','semnat',${r.semnat})">${r.semnat ? 'DA' : 'NU'}</span>
       </td>
@@ -4004,6 +4024,14 @@ function _regRow(r, nr) {
     </tr>`;
 }
 
+function setRgCurrency(cur) {
+  const hidden = document.getElementById('rg-currency');
+  if (hidden) hidden.value = cur;
+  document.querySelectorAll('#rg-currency-toggle .toggle-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim() === cur);
+  });
+}
+
 async function addReceipt() {
   const serie    = document.getElementById('rg-serie').value.trim();
   const date     = document.getElementById('rg-date').value;
@@ -4012,6 +4040,7 @@ async function addReceipt() {
   const contract = document.getElementById('rg-contract').value.trim();
   const baza     = parseFloat(document.getElementById('rg-baza').value) || 0;
   const comp     = parseFloat(document.getElementById('rg-comp').value) || 0;
+  const currency = document.getElementById('rg-currency')?.value || 'MDL';
   if (!serie)  { alert('Completați Seria și Nr.'); return; }
   if (!date)   { alert('Selectați data.'); return; }
   if (!client) { alert('Completați numele clientului.'); return; }
@@ -4020,7 +4049,7 @@ async function addReceipt() {
   const { data, error } = await db.from('receipts').insert([{
     serie_nr: serie, date, client_name: client, cod_personal: cod,
     contract_nr: contract, plata_baza: baza, compensare: comp,
-    semnat: false, contabilitate: false
+    currency, semnat: false, contabilitate: false
   }]).select().single();
   if (btn) { btn.disabled = false; btn.textContent = 'Adaugă'; }
   if (error) { alert(error.message); return; }
@@ -4051,18 +4080,30 @@ function editReceipt(id) {
   const r = allReceipts.find(x => x.id === id);
   if (!r) return;
   row.dataset.editing = '1';
+  row.dataset.currency = r.currency || 'MDL';
   const cells = row.querySelectorAll('td');
   cells[1].innerHTML = `<input class="tei" type="text" value="${esc(r.serie_nr)}" data-f="serie_nr" style="width:110px">`;
   cells[2].innerHTML = `<input class="tei" type="date" value="${r.date}" data-f="date" style="width:120px">`;
   cells[3].innerHTML = `<input class="tei" type="text" value="${esc(r.client_name)}" data-f="client_name" style="width:150px" oninput="clientAcInput(this)" onkeydown="clientAcKeydown(event)" onblur="setTimeout(closeClientAc,200)">`;
   cells[4].innerHTML = `<input class="tei" type="text" value="${esc(r.cod_personal||'')}" data-f="cod_personal" style="width:110px">`;
   cells[5].innerHTML = `<input class="tei" type="text" value="${esc(r.contract_nr||'')}" data-f="contract_nr" style="width:120px">`;
-  cells[6].innerHTML = `<input class="tei" type="number" value="${r.plata_baza}" data-f="plata_baza" min="0" step="0.01" style="width:90px">`;
+  cells[6].innerHTML = `
+    <input class="tei" type="number" value="${r.plata_baza}" data-f="plata_baza" min="0" step="0.01" style="width:90px">
+    <div id="edit-currency-${id}" style="margin-top:4px">${currencyToggleHtml(row.dataset.currency, `setEditCurrency('${id}','MDL')`, `setEditCurrency('${id}','EUR')`)}</div>`;
   cells[7].innerHTML = `<input class="tei" type="number" value="${r.compensare}" data-f="compensare" min="0" step="0.01" style="width:90px">`;
   cells[8].textContent = '—';
   cells[11].innerHTML = `
     <button class="btn-edit-save" onclick="saveReceiptEdit('${id}')">✓</button>
     <button class="btn-edit-cancel" onclick="renderAdminTabContent()">✕</button>`;
+}
+
+function setEditCurrency(id, cur) {
+  const row = document.querySelector(`tr[data-receipt-id="${id}"]`);
+  if (!row) return;
+  row.dataset.currency = cur;
+  document.querySelectorAll(`#edit-currency-${id} .toggle-btn`).forEach(b => {
+    b.classList.toggle('active', b.textContent.trim() === cur);
+  });
 }
 
 async function saveReceiptEdit(id) {
@@ -4077,6 +4118,7 @@ async function saveReceiptEdit(id) {
     contract_nr:  get('contract_nr').trim(),
     plata_baza:   parseFloat(get('plata_baza')) || 0,
     compensare:   parseFloat(get('compensare'))  || 0,
+    currency:     row.dataset.currency || 'MDL',
   };
   if (!updates.serie_nr)    { alert('Seria și Nr. este obligatorie.'); return; }
   if (!updates.client_name) { alert('Numele clientului este obligatoriu.'); return; }
@@ -4090,15 +4132,17 @@ async function saveReceiptEdit(id) {
 
 function exportRegistruCSV() {
   const sorted = [...allReceipts].sort((a,b) => a.date < b.date ? 1 : -1);
-  const header = ['Nr.','Seria si Nr.','Data','Nume Prenume Client','Cod Personal','Nr. Contract','Plata de baza (MDL)','Compensare cheltuieli (MDL)','Total bon (MDL)','Semnat client','Prezent contabilitate'];
+  const header = ['Nr.','Seria si Nr.','Data','Nume Prenume Client','Cod Personal','Nr. Contract','Moneda','Plata de baza','Compensare cheltuieli','Total bon','Semnat client','Prezent contabilitate'];
   const rows   = sorted.map((r,i) => {
     const total = (Number(r.plata_baza)||0) + (Number(r.compensare)||0);
-    return [i+1, r.serie_nr, fmtDate(r.date), r.client_name, r.cod_personal ? `="${r.cod_personal}"` : '', r.contract_nr||'',
+    return [i+1, r.serie_nr, fmtDate(r.date), r.client_name, r.cod_personal ? `="${r.cod_personal}"` : '', r.contract_nr||'', r.currency||'MDL',
       Number(r.plata_baza).toFixed(2), Number(r.compensare).toFixed(2), total.toFixed(2),
       r.semnat?'DA':'NU', r.contabilitate?'DA':'NU'];
   });
-  const totalBaza = sorted.reduce((s,r) => s + (Number(r.plata_baza)||0), 0);
-  const totalRow  = ['', '', '', 'TOTAL', '', '', totalBaza.toFixed(2), '', '', '', ''];
+  const totalBazaMDL = sorted.filter(r => (r.currency||'MDL')==='MDL').reduce((s,r) => s + (Number(r.plata_baza)||0), 0);
+  const totalBazaEUR = sorted.filter(r => r.currency==='EUR').reduce((s,r) => s + (Number(r.plata_baza)||0), 0);
+  const totalCell = [totalBazaMDL>0 ? `${totalBazaMDL.toFixed(2)} MDL` : '', totalBazaEUR>0 ? `${totalBazaEUR.toFixed(2)} EUR` : ''].filter(Boolean).join(' + ');
+  const totalRow  = ['', '', '', 'TOTAL', '', '', '', totalCell, '', '', '', ''];
   const csv = [header, ...rows, totalRow].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   saveAs(blob, `Registru-${todayStr()}.csv`);
@@ -4981,8 +5025,10 @@ function showClientReceipts(clientId, event) {
     .filter(r => reportBelongsToClient(r, c))
     .sort((a, b) => a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0);
 
-  const totalBaza = receipts.reduce((s, r) => s + (Number(r.plata_baza) || 0), 0);
-  const totalComp = receipts.reduce((s, r) => s + (Number(r.compensare) || 0), 0);
+  const totalBazaMDL = receipts.filter(r => (r.currency||'MDL')==='MDL').reduce((s, r) => s + (Number(r.plata_baza) || 0), 0);
+  const totalBazaEUR = receipts.filter(r => r.currency==='EUR').reduce((s, r) => s + (Number(r.plata_baza) || 0), 0);
+  const totalCompMDL = receipts.filter(r => (r.currency||'MDL')==='MDL').reduce((s, r) => s + (Number(r.compensare) || 0), 0);
+  const totalCompEUR = receipts.filter(r => r.currency==='EUR').reduce((s, r) => s + (Number(r.compensare) || 0), 0);
 
   const dispModalName = c.name.replace(/\s*-\s*FINALIZAT\s*$/i, '').trim();
   document.getElementById('modal-title').innerHTML = `
@@ -4999,8 +5045,8 @@ function showClientReceipts(clientId, event) {
       ? `<div class="empty-state" style="padding:16px 20px 32px"><p>Nicio chitanță înregistrată pentru acest client.</p></div>`
       : `<div style="padding:0 20px">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-            <span class="reg-total-badge">Total plată de bază: ${fmtMoneyCents(totalBaza)}</span>
-            ${totalComp > 0 ? `<span class="reg-total-badge">Total compensare: ${fmtMoneyCents(totalComp)}</span>` : ''}
+            <span class="reg-total-badge">Total plată de bază: ${fmtSplitCents(totalBazaMDL, totalBazaEUR)}</span>
+            ${(totalCompMDL > 0 || totalCompEUR > 0) ? `<span class="reg-total-badge">Total compensare: ${fmtSplitCents(totalCompMDL, totalCompEUR)}</span>` : ''}
           </div>
         </div>
         <div class="reg-wrap" style="max-height:40vh;overflow-y:auto">
@@ -5018,15 +5064,16 @@ function showClientReceipts(clientId, event) {
             </tr></thead>
             <tbody>
               ${receipts.map((r, i) => {
+                const cur = r.currency || 'MDL';
                 const total = (Number(r.plata_baza)||0) + (Number(r.compensare)||0);
                 return `<tr>
                   <td class="reg-nr">${i+1}</td>
                   <td style="font-weight:600;font-size:13px">${esc(r.serie_nr)}</td>
                   <td class="td-date">${fmtDate(r.date)}</td>
                   <td style="color:var(--muted);font-size:12px">${esc(r.contract_nr)||'—'}</td>
-                  <td class="reg-money">${r.plata_baza > 0 ? fmtMoneyCents(Number(r.plata_baza)) : '—'}</td>
-                  <td class="reg-money">${r.compensare > 0 ? fmtMoneyCents(Number(r.compensare)) : '—'}</td>
-                  <td class="reg-total">${total > 0 ? fmtMoneyCents(total) : '—'}</td>
+                  <td class="reg-money">${r.plata_baza > 0 ? fmtMoneyCents(Number(r.plata_baza), cur) : '—'}</td>
+                  <td class="reg-money">${r.compensare > 0 ? fmtMoneyCents(Number(r.compensare), cur) : '—'}</td>
+                  <td class="reg-total">${total > 0 ? fmtMoneyCents(total, cur) : '—'}</td>
                   <td style="text-align:center"><span class="${r.semnat ? 'badge-da' : 'badge-nu'}">${r.semnat ? 'DA' : 'NU'}</span></td>
                   <td style="text-align:center"><span class="${r.contabilitate ? 'badge-da' : 'badge-nu'}">${r.contabilitate ? 'DA' : 'NU'}</span></td>
                 </tr>`;
