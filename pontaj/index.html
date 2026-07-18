@@ -1131,7 +1131,7 @@ function initDateRange() {
   };
 }
 const _dr = initDateRange();
-const state = { dateStart: _dr.start, dateEnd: _dr.end, filterUser: 'all', viewMode: 'admin', customGroup: [], adminTab: 'pontaj', clientiSearch: '', clientiStatus: 'all', registruSearch: '', pontajPage: 1, registruPage: 1, avocatTab: 'pontaj', activePreset: '30d', siteStatsDays: 30 };
+const state = { dateStart: _dr.start, dateEnd: _dr.end, filterUser: 'all', viewMode: 'admin', customGroup: [], adminTab: 'pontaj', clientiSearch: '', clientiStatus: 'all', registruSearch: '', registruDateStart: null, registruDateEnd: null, registruPreset: 'all', pontajPage: 1, registruPage: 1, avocatTab: 'pontaj', activePreset: '30d', siteStatsDays: 30 };
 const PAGE_SIZE = 30;
 function isAdmin(u) { return u?.role === 'admin' || u?.role === 'owner'; }
 
@@ -1779,6 +1779,82 @@ function rangePicker() {
       </div>
     </div>
   `;
+}
+
+// Registru's own period filter — separate state from the Pontaj/Dashboard
+// range above so switching one doesn't move the other. null start/end means
+// unfiltered (show the whole registru).
+function setRegistruDateRange(start, end, preset = null) {
+  state.registruDateStart = start;
+  state.registruDateEnd = end;
+  state.registruPage = 1;
+  state.registruPreset = preset;
+  renderAdminTabContent();
+}
+
+function quickRegistruRange(preset) {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth() + 1;
+  const today = now.toISOString().split('T')[0];
+  if (preset === 'week') {
+    const day = now.getDay() || 7;
+    const mon = new Date(now); mon.setDate(now.getDate() - day + 1);
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    setRegistruDateRange(mon.toISOString().split('T')[0], sun.toISOString().split('T')[0], preset);
+  } else if (preset === 'month') {
+    const last = new Date(y, m, 0).getDate();
+    setRegistruDateRange(`${y}-${String(m).padStart(2,'0')}-01`, `${y}-${String(m).padStart(2,'0')}-${String(last).padStart(2,'0')}`, preset);
+  } else if (preset === 'lastmonth') {
+    const pm = m === 1 ? 12 : m - 1, py = m === 1 ? y - 1 : y;
+    const last = new Date(py, pm, 0).getDate();
+    setRegistruDateRange(`${py}-${String(pm).padStart(2,'0')}-01`, `${py}-${String(pm).padStart(2,'0')}-${String(last).padStart(2,'0')}`, preset);
+  } else if (preset === '30d') {
+    const from = new Date(now); from.setDate(now.getDate() - 29);
+    setRegistruDateRange(from.toISOString().split('T')[0], today, preset);
+  } else if (preset === 'all') {
+    setRegistruDateRange(null, null, preset);
+  }
+}
+
+function registruRangePicker() {
+  return `
+    <div class="range-picker" id="registru-range-picker">
+      <div class="range-presets">
+        <button class="preset-chip${state.registruPreset==='week'?' active':''}" onclick="quickRegistruRange('week')">Săpt. curentă</button>
+        <button class="preset-chip${state.registruPreset==='month'?' active':''}" onclick="quickRegistruRange('month')">Luna curentă</button>
+        <button class="preset-chip${state.registruPreset==='lastmonth'?' active':''}" onclick="quickRegistruRange('lastmonth')">Luna trecută</button>
+        <button class="preset-chip${state.registruPreset==='30d'?' active':''}" onclick="quickRegistruRange('30d')">Ultimele 30 zile</button>
+        <button class="preset-chip${state.registruPreset==='all'?' active':''}" onclick="quickRegistruRange('all')">Total</button>
+      </div>
+      <div class="range-inputs">
+        <input type="date" class="range-date-input" value="${state.registruDateStart||''}" max="${todayStr()}"
+          onclick="try{this.showPicker()}catch(e){}"
+          onchange="setRegistruDateRange(this.value, document.getElementById('registru-range-end').value || this.value)">
+        <span class="range-sep">→</span>
+        <input type="date" id="registru-range-end" class="range-date-input" value="${state.registruDateEnd||''}" max="${todayStr()}"
+          onclick="try{this.showPicker()}catch(e){}"
+          onchange="setRegistruDateRange(document.querySelector('#registru-range-picker .range-date-input').value, this.value)">
+      </div>
+    </div>
+  `;
+}
+
+// Registru list filtered by the active period + search — the single source
+// of truth for both the on-screen table/total and the CSV export, so they
+// never disagree about what's "currently shown".
+function getFilteredReceipts() {
+  const all = [...allReceipts].sort((a,b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+  const withRange = (state.registruDateStart && state.registruDateEnd)
+    ? all.filter(r => r.date >= state.registruDateStart && r.date <= state.registruDateEnd)
+    : all;
+  const q = (state.registruSearch || '').trim().toLowerCase();
+  return !q ? withRange : withRange.filter(r =>
+    (r.client_name||'').toLowerCase().includes(q) ||
+    (r.serie_nr||'').toLowerCase().includes(q) ||
+    (r.cod_personal||'').toLowerCase().includes(q) ||
+    (r.contract_nr||'').toLowerCase().includes(q) ||
+    fmtDate(r.date).toLowerCase().includes(q)
+  );
 }
 
 // ═══════════════════════════════════════
@@ -3909,19 +3985,18 @@ function _filterInvEntries() {
 
 // ── Tab: Registru (admin only) ────────────────────────────
 function renderRegistru(container) {
-  const all = [...allReceipts].sort((a,b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+  const allUnfiltered = allReceipts.length;
   const q = (state.registruSearch || '').trim().toLowerCase();
-  const sorted = !q ? all : all.filter(r =>
-    (r.client_name||'').toLowerCase().includes(q) ||
-    (r.serie_nr||'').toLowerCase().includes(q) ||
-    (r.cod_personal||'').toLowerCase().includes(q) ||
-    (r.contract_nr||'').toLowerCase().includes(q) ||
-    fmtDate(r.date).toLowerCase().includes(q)
-  );
+  const isFiltered = q || (state.registruDateStart && state.registruDateEnd);
+  const sorted = getFilteredReceipts();
 
   const { items: pageReceipts, page: registruPage, totalPages: registruTotalPages, start: registruStart } = paginate(sorted, state.registruPage, PAGE_SIZE);
 
   container.innerHTML = `
+    <div class="controls" style="margin-bottom:20px">
+      ${registruRangePicker()}
+    </div>
+
     <div class="add-form" style="margin-bottom:28px">
       <div class="form-title">Înregistrare nouă</div>
       <div class="reg-form-grid">
@@ -3962,7 +4037,7 @@ function renderRegistru(container) {
       </div>
     </div>
 
-    ${all.length === 0 ? '' : `
+    ${allUnfiltered === 0 ? '' : `
     <div class="search-bar">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" id="registru-search" placeholder="Caută client, serie, cod personal, contract..." value="${esc(state.registruSearch||'')}" oninput="searchRegistru(this)" autocomplete="off">
@@ -3972,7 +4047,7 @@ function renderRegistru(container) {
     <div class="table-wrap">
       <div class="table-header">
         <div style="display:flex;align-items:center;gap:12px">
-          <span class="table-title">Registru chitanțe (${sorted.length}${q ? ` din ${all.length}` : ''})</span>
+          <span class="table-title">Registru chitanțe (${sorted.length}${isFiltered ? ` din ${allUnfiltered}` : ''})</span>
           ${sorted.length ? `<span class="reg-total-badge">Total plată de bază: ${fmtSplitCents(
             sorted.filter(r => (r.currency||'MDL') === 'MDL').reduce((s,r) => s + (Number(r.plata_baza)||0), 0),
             sorted.filter(r => r.currency === 'EUR').reduce((s,r) => s + (Number(r.plata_baza)||0), 0)
@@ -3980,13 +4055,13 @@ function renderRegistru(container) {
         </div>
         <div style="display:flex;align-items:center;gap:16px">
           ${pagerBar(registruPage, registruTotalPages, 'setRegistruPage', 'top')}
-          ${all.length ? `<button class="btn-ghost" onclick="exportRegistruCSV()" style="font-size:12px">↓ Export CSV</button>` : ''}
+          ${allUnfiltered ? `<button class="btn-ghost" onclick="exportRegistruCSV()" style="font-size:12px">↓ Export CSV</button>` : ''}
         </div>
       </div>
-      ${all.length === 0
+      ${allUnfiltered === 0
         ? `<div class="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.3;margin-bottom:12px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg><p>Nicio înregistrare în registru.<br>Completează formularul de mai sus.</p></div>`
         : sorted.length === 0
-        ? `<div class="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.3;margin-bottom:12px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><p>Nicio înregistrare găsită pentru "${esc(state.registruSearch)}".</p></div>`
+        ? `<div class="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.3;margin-bottom:12px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><p>Nicio înregistrare găsită pentru filtrele selectate.</p></div>`
         : `<div class="reg-wrap"><table class="reg-table">
             <thead><tr>
               <th class="reg-nr">Nr.</th>
@@ -4146,7 +4221,9 @@ async function saveReceiptEdit(id) {
 }
 
 function exportRegistruCSV() {
-  const sorted = [...allReceipts].sort((a,b) => a.date < b.date ? 1 : -1);
+  // Matches whatever is currently filtered on screen (period + search),
+  // not the whole registru — same list the table and total badge use.
+  const sorted = getFilteredReceipts();
   const header = ['Nr.','Seria si Nr.','Data','Nume Prenume Client','Cod Personal','Nr. Contract','Moneda','Plata de baza','Compensare cheltuieli','Total bon','Semnat client','Prezent contabilitate'];
   const rows   = sorted.map((r,i) => {
     const total = (Number(r.plata_baza)||0) + (Number(r.compensare)||0);
