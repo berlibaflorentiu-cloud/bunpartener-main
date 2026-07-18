@@ -1558,6 +1558,12 @@ function fmtMoney(n) {
   return n.toLocaleString('ro-RO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' MDL';
 }
 
+// Same as fmtMoney but keeps cents — used for Registru (receipts), where
+// sums are entered to the ban and shouldn't round away on display.
+function fmtMoneyCents(n) {
+  return n.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' MDL';
+}
+
 // Split earnings into EUR (hourly) and MDL (fixed-price), then format.
 // getRateForEntry(e) → the EUR/h rate for that entry's lawyer.
 function splitEarnings(entries, getRateForEntry) {
@@ -3936,7 +3942,7 @@ function renderRegistru(container) {
       <div class="table-header">
         <div style="display:flex;align-items:center;gap:12px">
           <span class="table-title">Registru chitanțe (${sorted.length}${q ? ` din ${all.length}` : ''})</span>
-          ${sorted.length ? `<span class="reg-total-badge">Total plată de bază: ${fmtMoney(sorted.reduce((s,r) => s + (Number(r.plata_baza)||0), 0))}</span>` : ''}
+          ${sorted.length ? `<span class="reg-total-badge">Total plată de bază: ${fmtMoneyCents(sorted.reduce((s,r) => s + (Number(r.plata_baza)||0), 0))}</span>` : ''}
         </div>
         <div style="display:flex;align-items:center;gap:16px">
           ${pagerBar(registruPage, registruTotalPages, 'setRegistruPage', 'top')}
@@ -3982,9 +3988,9 @@ function _regRow(r, nr) {
       <td>${esc(r.client_name)}</td>
       <td style="color:var(--muted);font-size:12px">${esc(r.cod_personal)||'—'}</td>
       <td style="color:var(--muted);font-size:12px">${esc(r.contract_nr)||'—'}</td>
-      <td class="reg-money">${r.plata_baza > 0 ? fmtMoney(Number(r.plata_baza)) : '—'}</td>
-      <td class="reg-money">${r.compensare > 0 ? fmtMoney(Number(r.compensare)) : '—'}</td>
-      <td class="reg-total">${total > 0 ? fmtMoney(total) : '—'}</td>
+      <td class="reg-money">${r.plata_baza > 0 ? fmtMoneyCents(Number(r.plata_baza)) : '—'}</td>
+      <td class="reg-money">${r.compensare > 0 ? fmtMoneyCents(Number(r.compensare)) : '—'}</td>
+      <td class="reg-total">${total > 0 ? fmtMoneyCents(total) : '—'}</td>
       <td style="text-align:center">
         <span class="${r.semnat ? 'badge-da' : 'badge-nu'}" onclick="toggleReceiptField('${r.id}','semnat',${r.semnat})">${r.semnat ? 'DA' : 'NU'}</span>
       </td>
@@ -4993,8 +4999,8 @@ function showClientReceipts(clientId, event) {
       ? `<div class="empty-state" style="padding:16px 20px 32px"><p>Nicio chitanță înregistrată pentru acest client.</p></div>`
       : `<div style="padding:0 20px">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-            <span class="reg-total-badge">Total plată de bază: ${fmtMoney(totalBaza)}</span>
-            ${totalComp > 0 ? `<span class="reg-total-badge">Total compensare: ${fmtMoney(totalComp)}</span>` : ''}
+            <span class="reg-total-badge">Total plată de bază: ${fmtMoneyCents(totalBaza)}</span>
+            ${totalComp > 0 ? `<span class="reg-total-badge">Total compensare: ${fmtMoneyCents(totalComp)}</span>` : ''}
           </div>
         </div>
         <div class="reg-wrap" style="max-height:40vh;overflow-y:auto">
@@ -5018,9 +5024,9 @@ function showClientReceipts(clientId, event) {
                   <td style="font-weight:600;font-size:13px">${esc(r.serie_nr)}</td>
                   <td class="td-date">${fmtDate(r.date)}</td>
                   <td style="color:var(--muted);font-size:12px">${esc(r.contract_nr)||'—'}</td>
-                  <td class="reg-money">${r.plata_baza > 0 ? fmtMoney(Number(r.plata_baza)) : '—'}</td>
-                  <td class="reg-money">${r.compensare > 0 ? fmtMoney(Number(r.compensare)) : '—'}</td>
-                  <td class="reg-total">${total > 0 ? fmtMoney(total) : '—'}</td>
+                  <td class="reg-money">${r.plata_baza > 0 ? fmtMoneyCents(Number(r.plata_baza)) : '—'}</td>
+                  <td class="reg-money">${r.compensare > 0 ? fmtMoneyCents(Number(r.compensare)) : '—'}</td>
+                  <td class="reg-total">${total > 0 ? fmtMoneyCents(total) : '—'}</td>
                   <td style="text-align:center"><span class="${r.semnat ? 'badge-da' : 'badge-nu'}">${r.semnat ? 'DA' : 'NU'}</span></td>
                   <td style="text-align:center"><span class="${r.contabilitate ? 'badge-da' : 'badge-nu'}">${r.contabilitate ? 'DA' : 'NU'}</span></td>
                 </tr>`;
