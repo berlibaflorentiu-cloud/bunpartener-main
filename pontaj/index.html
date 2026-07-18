@@ -4711,7 +4711,6 @@ async function confirmBon(id) {
   if (!r || !s) return;
   const address = (document.getElementById('bon-address')?.value || '').trim();
   const description = (document.getElementById('bon-description')?.value || '').trim();
-  if (!address) { alert('Completează adresa beneficiarului.'); return; }
   if (!description) { alert('Completează descrierea serviciului.'); return; }
 
   const hasNumber = !!r.serie_nr;
