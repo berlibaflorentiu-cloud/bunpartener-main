@@ -730,6 +730,11 @@
         --border: #ddd; --surface2: #f5f5f5; --gold-dim: #f9f4ea;
         --bg: white; --surface: white;
       }
+      /* Bon de plată prints on A5 (the physical pre-numbered pads are A5) —
+         scoped to this document only via a named page, so it doesn't affect
+         the A4 Act document that shares this same print stylesheet. */
+      #bon-document { page: bon-page; width: 132mm; margin: 0 auto; }
+      @page bon-page { size: A5 portrait; margin: 8mm; }
     }
 
     /* ── ACT DOCUMENT — editable before print/download/save ── */
@@ -760,44 +765,54 @@
       background: #fff;
       color: #111;
       font-family: 'DM Sans', sans-serif;
-      font-size: 12px;
-      line-height: 1.35;
+      font-size: 10.5px;
+      line-height: 1.2;
       border: 1.5px solid #111;
-      padding: 16px 18px;
+      padding: 10px 12px;
     }
     #bon-document .bon-formular-tip {
       text-align: right;
-      font-size: 9px;
-      line-height: 1.3;
+      font-size: 7.5px;
+      line-height: 1.2;
       color: #333;
-      margin-bottom: 8px;
+      margin-bottom: 5px;
     }
-    #bon-document .bon-head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 10px; }
-    #bon-document .bon-title { font-size: 17px; font-weight: 700; }
-    #bon-document .bon-title-sub { font-size: 9px; color: #444; font-style: italic; }
-    #bon-document .bon-seria-nr { font-size: 14px; margin-top: 4px; }
-    #bon-document .bon-field-row { display: flex; gap: 10px; border-bottom: 1px solid #111; padding: 5px 0; align-items: flex-start; }
-    #bon-document .bon-field-label { font-size: 9px; color: #444; width: 150px; flex-shrink: 0; line-height: 1.25; }
-    #bon-document .bon-field-value { flex: 1; font-size: 13px; text-align: center; }
-    #bon-document .bon-field-code { border: 1px solid #111; padding: 3px 10px; font-size: 12px; white-space: nowrap; }
-    #bon-document table.bon-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 10.5px; }
-    #bon-document table.bon-table th, #bon-document table.bon-table td { border: 1px solid #111; padding: 5px 6px; vertical-align: top; }
-    #bon-document table.bon-table th { font-size: 8.5px; font-weight: 500; color: #333; text-align: center; }
+    #bon-document .bon-head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 6px; }
+    #bon-document .bon-title { font-size: 15px; font-weight: 700; }
+    #bon-document .bon-title-sub { font-size: 8px; color: #444; font-style: italic; }
+    #bon-document .bon-seria-nr { font-size: 12px; margin-top: 2px; }
+    #bon-document .bon-field-row { display: flex; gap: 10px; border-bottom: 1px solid #111; padding: 3px 0; align-items: flex-start; }
+    #bon-document .bon-field-label { font-size: 7.5px; color: #444; width: 130px; flex-shrink: 0; line-height: 1.2; }
+    #bon-document .bon-field-value { flex: 1; font-size: 11px; text-align: center; }
+    #bon-document .bon-field-code { border: 1px solid #111; padding: 2px 8px; font-size: 10px; white-space: nowrap; }
+    #bon-document table.bon-table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 6px; font-size: 9px; }
+    #bon-document table.bon-table th, #bon-document table.bon-table td { border: 1px solid #111; padding: 3px 5px; vertical-align: top; }
+    #bon-document table.bon-table th { font-size: 7px; font-weight: 500; color: #333; text-align: center; line-height: 1.15; }
     #bon-document table.bon-table td.bon-desc-cell { text-align: left; }
     #bon-document table.bon-table td.bon-num-cell { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    #bon-document .bon-total-words { display: flex; align-items: baseline; gap: 10px; margin-top: 10px; font-size: 12px; }
-    #bon-document .bon-total-words strong { font-size: 13px; }
-    #bon-document .bon-sign-row { display: flex; justify-content: space-between; margin-top: 28px; gap: 24px; }
+    #bon-document .bon-total-words { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; font-size: 10.5px; }
+    #bon-document .bon-total-words strong { font-size: 11px; }
+    #bon-document .bon-sign-row { display: flex; justify-content: space-between; margin-top: 14px; gap: 24px; }
     #bon-document .bon-sign-block { flex: 1; text-align: center; }
-    #bon-document .bon-sign-line { border-bottom: 1px solid #111; height: 34px; }
-    #bon-document .bon-sign-label { font-size: 9px; color: #444; margin-top: 4px; }
+    #bon-document .bon-sign-line { border-bottom: 1px solid #111; height: 30px; }
+    #bon-document .bon-sign-label { font-size: 7.5px; color: #444; margin-top: 3px; }
     /* BuNPartener's own stamp + cashier signature are pre-filled so the firm
        doesn't have to wet-sign/stamp every single printed receipt; only the
-       beneficiary's signature block stays genuinely blank. */
-    #bon-document .bon-sign-visual { position: relative; height: 60px; }
-    #bon-document .bon-stamp-img { position: absolute; left: 4px; bottom: -14px; height: 88px; width: auto; opacity: .9; }
-    #bon-document .bon-casier-sig-img { position: absolute; left: 86px; bottom: -2px; height: 52px; width: auto; }
-    #bon-document .bon-footer-print { text-align: center; font-size: 7.5px; color: #555; margin-top: 14px; }
+       beneficiary's signature block stays genuinely blank. Normal flow (no
+       absolute positioning) so nothing can overflow past the page edge when
+       captured by html2canvas. */
+    #bon-document .bon-sign-visual {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 2px;
+      border-bottom: 1px solid #111;
+      height: 34px;
+      overflow: visible;
+    }
+    #bon-document .bon-stamp-img { height: 40px; width: auto; opacity: .9; margin-bottom: -5px; }
+    #bon-document .bon-casier-sig-img { height: 27px; width: auto; margin-bottom: 1px; }
+    #bon-document .bon-footer-print { text-align: center; font-size: 6.5px; color: #555; margin-top: 8px; }
 
     /* ── ADMIN TABS ── */
     .admin-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:24px; overflow-x:auto; scrollbar-width:none; }
@@ -4731,7 +4746,7 @@ function renderBonDocumentHTML(r) {
   if (Number(r.compensare) > 0) rows.push({ desc: 'Compensare cheltuieli conform contractului menționat mai sus.', amount: Number(r.compensare) });
   if (rows.length === 0) rows.push({ desc: r.bon_description || '', amount: 0 });
 
-  const blankRows = Math.max(0, 3 - rows.length);
+  const blankRows = Math.max(0, 2 - rows.length);
 
   return `
     <div id="bon-document">
@@ -4776,13 +4791,13 @@ function renderBonDocumentHTML(r) {
       <table class="bon-table">
         <thead>
           <tr>
-            <th style="width:38%">Denumirea mărfii (lucrărilor, serviciilor)<br>Наименование товара (работ, услуг)</th>
-            <th>Unit. de măsură<br>Единица изм.</th>
-            <th>Cantitatea<br>Количество</th>
-            <th>Valoarea fără TVA, lei<br>Стоимость без НДС, леев</th>
-            <th>Suma TVA, lei<br>Сумма НДС, леев</th>
-            <th>Impozitul pe venit aferent serviciilor, lei<br>Подоходный налог с услуг, леев</th>
-            <th>Total de plată, lei<br>Общая сумма к оплате, леев</th>
+            <th style="width:46%">Denumirea mărfii (lucrărilor, serviciilor)<br>Наименование товара (работ, услуг)</th>
+            <th style="width:6%">Unit. de măsură<br>Единица изм.</th>
+            <th style="width:7%">Cantitatea<br>Количество</th>
+            <th style="width:10%">Valoarea fără TVA, lei<br>Стоимость без НДС, леев</th>
+            <th style="width:6%">Suma TVA, lei<br>Сумма НДС, леев</th>
+            <th style="width:11%">Impozitul pe venit aferent serviciilor, lei<br>Подоходный налог с услуг, леев</th>
+            <th style="width:14%">Total de plată, lei<br>Общая сумма к оплате, леев</th>
           </tr>
         </thead>
         <tbody>
@@ -4815,7 +4830,6 @@ function renderBonDocumentHTML(r) {
           <div class="bon-sign-visual">
             <img class="bon-stamp-img" data-asset="stamp-bunpartener.png" alt="">
             <img class="bon-casier-sig-img" data-asset="semnatura-casier.png" alt="">
-            <div class="bon-sign-line"></div>
           </div>
           <div class="bon-sign-label">Semnătura casierului<br>Подпись кассира</div>
         </div>
@@ -4872,11 +4886,11 @@ async function downloadBonPDF(id) {
   await Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(res => { img.onload = res; img.onerror = res; })));
   const r = allReceipts.find(x => x.id === id);
   html2pdf().set({
-    margin: [10, 10, 10, 10],
+    margin: [6, 6, 6, 6],
     filename: `bon-${(r?.serie_nr || 'plata').replace(/\s+/g,'-')}.pdf`,
     image:    { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' },
-    jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    html2canvas: { scale: 3, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' },
+    jsPDF:    { unit: 'mm', format: 'a5', orientation: 'portrait' },
   }).from(el).save();
 }
 
