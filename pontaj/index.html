@@ -791,12 +791,19 @@
     .badge-nu { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; background: rgba(139,148,158,0.1); color: var(--muted); border: 1px solid var(--border); cursor: pointer; transition: all .15s; white-space: nowrap; user-select: none; }
     .badge-da:hover { background: rgba(63,185,80,0.25); }
     .badge-nu:hover { border-color: var(--muted); color: var(--text); }
-    .reg-form-grid { display: grid; grid-template-columns: 110px 120px 1fr 120px 140px 100px 100px 128px auto; gap: 10px; align-items: end; }
+    .reg-form-grid {
+      display: grid;
+      grid-template-columns:
+        minmax(84px,110px) minmax(96px,120px) minmax(110px,1fr) minmax(84px,120px)
+        minmax(96px,140px) minmax(64px,100px) minmax(64px,100px) minmax(78px,100px) minmax(64px,auto);
+      gap: 10px;
+      align-items: end;
+    }
     @media (max-width: 900px) { .reg-form-grid { grid-template-columns: 1fr 1fr; } .reg-form-grid > * { grid-column: span 1; } .reg-form-grid .btn-primary { grid-column: span 2; } }
 
     /* Currency toggle sized to sit flush with a .field input (Registru add-form) */
     .toggle-group.reg { padding: 3px; box-sizing: border-box; }
-    .toggle-group.reg .toggle-btn { flex: 1; padding: 8px 0; font-size: 13px; text-align: center; }
+    .toggle-group.reg .toggle-btn { flex: 1; padding: 7px 0; font-size: 12px; text-align: center; }
 
     /* Currency toggle sized for an inline table-cell edit (Registru row edit) */
     .toggle-group.regcell { border-color: var(--gold); padding: 2px; margin-top: 5px; width: 72px; box-sizing: border-box; }
@@ -3951,7 +3958,7 @@ function renderRegistru(container) {
           <div id="rg-currency-toggle">${currencyToggleHtml('MDL', "setRgCurrency('MDL')", "setRgCurrency('EUR')", 'reg')}</div>
           <input type="hidden" id="rg-currency" value="MDL">
         </div>
-        <button class="btn-primary" onclick="addReceipt()" style="height:40px;padding:0 22px;display:flex;align-items:center;justify-content:center">Adaugă</button>
+        <button class="btn-primary" onclick="addReceipt()" style="height:40px;padding:0 16px;display:flex;align-items:center;justify-content:center;white-space:nowrap">Adaugă</button>
       </div>
     </div>
 
