@@ -4820,6 +4820,9 @@ async function renderBonScanToCanvas(r) {
     // unnumbered, while copy 2 receives the client-copy marker.
     ctx.fillStyle = '#fff';
     ctx.fillRect(140, 55, 220, 48);
+    // Copy 3's publisher line sits higher because that source has no left
+    // signature block. Clear it so it can be restored below the added block.
+    ctx.fillRect(130, 958, 510, 42);
     if (canvas.dataset.copy === '2') {
       _bonCanvasText(ctx, '2', 151, 98, '700 38px "Times New Roman"');
       _bonCanvasText(ctx, 'ex. - clientului', 181, 75, '16px "Times New Roman"');
@@ -4862,6 +4865,7 @@ async function renderBonScanToCanvas(r) {
     ctx.stroke();
     _bonCanvasText(ctx, 'Semnătura casierului', 584, 940, '17px "Times New Roman"', 'center');
     _bonCanvasText(ctx, 'Подпись кассира', 584, 961, '17px "Times New Roman"', 'center');
+    _bonCanvasText(ctx, 'Editura de imprimate «Statistica», a5 (436). 05.98. t. 500x25x3', 138, 1010, '16px "Times New Roman"');
 
     ctx.restore();
     canvas.dataset.ready = '1';
