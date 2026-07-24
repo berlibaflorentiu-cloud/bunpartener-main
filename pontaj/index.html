@@ -1434,29 +1434,31 @@ async function fetchAndShow(userId) {
     currentUser = profile;
     localStorage.setItem('pontaj_profile', JSON.stringify(profile));
 
-    const [usersRes, entriesRes, atentiiRes] = await dbTimeout(Promise.all([
+    const [usersRes, entriesRes, atentiiRes, clientsRes] = await dbTimeout(Promise.all([
       db.from('profiles').select('*').order('name'),
       db.from('entries').select('*').order('date', { ascending: false }),
-      db.from('atentii').select('*').order('deadline_date')
+      db.from('atentii').select('*').order('deadline_date'),
+      db.from('clients').select('*').order('name'),
     ]));
     allUsers   = usersRes.data || [];
     allEntries = entriesRes.data || [];
     allAtentii = atentiiRes.data || [];
+    // Clients are read-only for avocat accounts too (RLS: clients_avocat_read) —
+    // fetched for everyone since the client/dosar autocomplete needs it regardless of role.
+    allClients = clientsRes.data || [];
     localStorage.setItem('pontaj_users_cache',   JSON.stringify(allUsers));
     localStorage.setItem('pontaj_entries_cache', JSON.stringify(allEntries));
     localStorage.setItem('pontaj_atentii_cache', JSON.stringify(allAtentii));
 
     if (isAdmin(currentUser)) {
       try {
-        const [cRes, iRes, ieRes, rRes, crRes, bbRes] = await dbTimeout(Promise.all([
-          db.from('clients').select('*').order('name'),
+        const [iRes, ieRes, rRes, crRes, bbRes] = await dbTimeout(Promise.all([
           db.from('invoices').select('*').order('created_at', { ascending: false }),
           db.from('invoice_entries').select('*'),
           db.from('receipts').select('*').order('date', { ascending: false }),
           db.from('client_reports').select('*').order('created_at', { ascending: false }),
           db.from('bon_batches').select('*').order('created_at', { ascending: false }),
         ]));
-        allClients        = cRes.data  || [];
         allInvoices       = iRes.data  || [];
         allInvoiceEntries = ieRes.data || [];
         allReceipts       = rRes.data  || [];
@@ -1480,11 +1482,12 @@ async function fetchAndShow(userId) {
 
 async function refreshInBackground(userId) {
   try {
-    const [profileRes, usersRes, entriesRes, atentiiRes] = await Promise.all([
+    const [profileRes, usersRes, entriesRes, atentiiRes, clientsRes] = await Promise.all([
       db.from('profiles').select('*').eq('id', userId).single(),
       db.from('profiles').select('*').order('name'),
       db.from('entries').select('*').order('date', { ascending: false }),
-      db.from('atentii').select('*').order('deadline_date')
+      db.from('atentii').select('*').order('deadline_date'),
+      db.from('clients').select('*').order('name'),
     ]);
     if (profileRes.data) {
       const wasApproved = currentUser?.status === 'approved';
@@ -1496,21 +1499,22 @@ async function refreshInBackground(userId) {
     allUsers   = usersRes.data   || [];
     allEntries = entriesRes.data || [];
     allAtentii = atentiiRes.data || [];
+    // Clients are read-only for avocat accounts too (RLS: clients_avocat_read) —
+    // fetched for everyone since the client/dosar autocomplete needs it regardless of role.
+    allClients = clientsRes.data || [];
     localStorage.setItem('pontaj_users_cache',   JSON.stringify(allUsers));
     localStorage.setItem('pontaj_entries_cache', JSON.stringify(allEntries));
     localStorage.setItem('pontaj_atentii_cache', JSON.stringify(allAtentii));
 
     if (isAdmin(currentUser)) {
       try {
-        const [cRes, iRes, ieRes, rRes, crRes, bbRes] = await Promise.all([
-          db.from('clients').select('*').order('name'),
+        const [iRes, ieRes, rRes, crRes, bbRes] = await Promise.all([
           db.from('invoices').select('*').order('created_at', { ascending: false }),
           db.from('invoice_entries').select('*'),
           db.from('receipts').select('*').order('date', { ascending: false }),
           db.from('client_reports').select('*').order('created_at', { ascending: false }),
           db.from('bon_batches').select('*').order('created_at', { ascending: false }),
         ]);
-        allClients        = cRes.data  || [];
         allInvoices       = iRes.data  || [];
         allInvoiceEntries = ieRes.data || [];
         allReceipts       = rRes.data  || [];
