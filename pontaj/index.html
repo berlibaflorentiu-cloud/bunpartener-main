@@ -4869,7 +4869,14 @@ function renderBonuri(container) {
   const urgent = batch && remaining <= 5;
   const low    = batch && remaining <= 10;
 
-  const mdlReceipts = allReceipts.filter(r => (r.currency || 'MDL') === 'MDL');
+  // Bonuri only contains entries that still need an official number, or
+  // entries already numbered from the official DAA series. Internal labels
+  // such as "33-Transfer" stay in Registru but never appear here.
+  const mdlReceipts = allReceipts.filter(r => {
+    if ((r.currency || 'MDL') !== 'MDL') return false;
+    const bonNumber = (r.serie_nr || '').trim();
+    return !bonNumber || /^DAA/i.test(bonNumber);
+  });
   const q = (state.bonuriSearch || '').trim().toLowerCase();
   const filterKey = state.bonuriFilter || 'all';
   let list = [...mdlReceipts].sort((a,b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
