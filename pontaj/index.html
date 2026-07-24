@@ -2603,13 +2603,17 @@ function renderImpozite(container) {
   const periodTotal = entries.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
   container.innerHTML = `
-    <div class="controls" style="gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="preset-btn${state.impozitePeriod===currentYear?' active':''}" onclick="setImpozitePeriod('${currentYear}')">Anul curent</button>
-      <select aria-label="Selectează anul" onchange="setImpozitePeriod(this.value)" style="padding:9px 34px 9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit">
-        ${state.impozitePeriod==='total' ? '<option value="" selected disabled>Selectează anul</option>' : ''}
-        ${years.map(year => `<option value="${year}"${state.impozitePeriod===year?' selected':''}>${year}</option>`).join('')}
-      </select>
-      <button class="preset-btn${state.impozitePeriod==='total'?' active':''}" onclick="setImpozitePeriod('total')">Total</button>
+    <div class="controls">
+      <div class="range-picker">
+        <div class="range-presets">
+          <button class="preset-chip${state.impozitePeriod===currentYear?' active':''}" onclick="setImpozitePeriod('${currentYear}')">Anul curent</button>
+          <select aria-label="Selectează anul" onchange="setImpozitePeriod(this.value)" style="padding:5px 30px 5px 12px;background:var(--surface);border:1px solid var(--border);border-radius:20px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;outline:none">
+            ${state.impozitePeriod==='total' ? '<option value="" selected disabled>Selectează anul</option>' : ''}
+            ${years.map(year => `<option value="${year}"${state.impozitePeriod===year?' selected':''}>${year}</option>`).join('')}
+          </select>
+          <button class="preset-chip${state.impozitePeriod==='total'?' active':''}" onclick="setImpozitePeriod('total')">Total</button>
+        </div>
+      </div>
     </div>
 
     <div class="add-form">
