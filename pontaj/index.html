@@ -1196,7 +1196,6 @@
       <span id="header-mode-toggle"></span>
       <span id="header-requests"></span>
       <span id="header-bonuri"></span>
-      <span id="header-avansuri"></span>
       <button class="btn-ghost btn-logout" onclick="logout()" aria-label="Deconectare" title="Deconectare">
         <svg class="ico-logout" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         <span class="logout-text">Deconectare</span>
@@ -1559,7 +1558,6 @@ async function refreshInBackground(userId) {
 
     updateRequestsBadge();
     updateBonuriBadge();
-    updateAvansuriBadge();
     render(); // Re-render silently with fresh data
   } catch (e) {
     // Silent — cached data already showing
@@ -1596,7 +1594,6 @@ function showApp() {
   updateModeToggle();
   updateRequestsBadge();
   updateBonuriBadge();
-  updateAvansuriBadge();
   _refreshClientDatalist();
   render();
 }
@@ -2522,7 +2519,6 @@ async function addAvans() {
   if (error) { alert(error.message); if (btn) { btn.disabled = false; btn.textContent = 'Adaugă'; } return; }
   allAvansuri.unshift(data);
   cacheAvansuri();
-  updateAvansuriBadge();
   renderAdminTabContent();
 }
 
@@ -2591,38 +2587,7 @@ async function confirmAvans(id) {
   if (error) { alert(error.message); if (btn) { btn.disabled = false; btn.textContent = 'Confirmă'; } return; }
   allAvansuri = allAvansuri.map(x => x.id === id ? { ...x, ...data } : x);
   cacheAvansuri();
-  updateAvansuriBadge();
-  renderAvocatTabContent(user);
-}
-
-// Header badge nudging a lawyer to confirm a pending avans — mirrors
-// updateRequestsBadge/updateBonuriBadge. Shown for any logged-in account
-// (admin included) that has an avans of their own still unconfirmed.
-function updateAvansuriBadge() {
-  const el = document.getElementById('header-avansuri');
-  if (!el) return;
-  const user = getCurrentUser();
-  if (!user) { el.innerHTML = ''; return; }
-  const pending = allAvansuri.filter(a => a.lawyer_id === user.id && !a.confirmed_at).length;
-  if (!pending) { el.innerHTML = ''; return; }
-  el.innerHTML = `<button class="btn-ghost" onclick="goToMyAvansuri()" style="border-color:#d9a441;color:#d9a441" title="Avansuri de confirmat">
-    Avansuri de confirmat: ${pending}
-  </button>`;
-}
-
-// The confirm button only ever appears on the personal (avocat-side)
-// Avansuri view, so an admin currently in admin view mode needs to switch
-// to their own "Pontajul meu" view first before landing on that tab.
-function goToMyAvansuri() {
-  const user = getCurrentUser();
-  if (isAdmin(user) && state.viewMode === 'admin') toggleViewMode();
-  state.avocatTab = 'avansuri';
-  document.querySelectorAll('#main-content .admin-tab').forEach(elx => {
-    const active = elx.dataset.tab === 'avansuri';
-    elx.classList.toggle('active', active);
-    elx.setAttribute('aria-selected', active);
-  });
-  renderAvocatTabContent(user);
+  renderAvocat(user); // full tab-bar re-render so the pending-count bubble updates too
 }
 
 function applyPreset() {
