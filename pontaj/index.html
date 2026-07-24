@@ -1188,6 +1188,7 @@
       <span id="header-mode-toggle"></span>
       <span id="header-requests"></span>
       <span id="header-bonuri"></span>
+      <span id="header-avansuri"></span>
       <button class="btn-ghost btn-logout" onclick="logout()" aria-label="Deconectare" title="Deconectare">
         <svg class="ico-logout" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         <span class="logout-text">Deconectare</span>
@@ -1550,6 +1551,7 @@ async function refreshInBackground(userId) {
 
     updateRequestsBadge();
     updateBonuriBadge();
+    updateAvansuriBadge();
     render(); // Re-render silently with fresh data
   } catch (e) {
     // Silent — cached data already showing
@@ -1586,6 +1588,7 @@ function showApp() {
   updateModeToggle();
   updateRequestsBadge();
   updateBonuriBadge();
+  updateAvansuriBadge();
   _refreshClientDatalist();
   render();
 }
@@ -2461,20 +2464,30 @@ function renderAvansuri(container, editable, user) {
               ${editable ? '<th style="width:190px">Avocat / Cont</th>' : ''}
               <th>Descriere</th>
               <th style="width:120px">Sumă</th>
+              <th style="width:150px">${editable ? 'Confirmare' : ''}</th>
               ${editable ? '<th style="width:82px"></th>' : ''}
             </tr></thead>
             <tbody>
-              ${entries.map(a => `
+              ${entries.map(a => {
+                const confirmed = !!a.confirmed_at;
+                const statusCell = editable
+                  ? `<span class="${confirmed ? 'badge-da' : 'badge-nu'}" title="${confirmed ? 'Confirmat de ' + esc(userMap[a.lawyer_id]?.name||'') + ' pe ' + fmtDate(a.confirmed_at.slice(0,10)) : 'Avocatul nu a confirmat încă acest avans'}">${confirmed ? 'CONFIRMAT' : 'NECONFIRMAT'}</span>`
+                  : confirmed
+                    ? `<span class="badge-da" title="Confirmat pe ${fmtDate(a.confirmed_at.slice(0,10))}">CONFIRMAT</span>`
+                    : `<button class="btn-primary" style="font-size:12px;padding:6px 14px" onclick="confirmAvans('${a.id}')">Confirmă</button>`;
+                return `
                 <tr data-avans-id="${a.id}">
                   <td class="td-date" data-label="Data">${fmtDate(a.date)}</td>
                   ${editable ? `<td class="td-av-lawyer" data-label="Avocat / Cont" style="color:var(--muted);font-size:13px">${esc(userMap[a.lawyer_id]?.name || 'Cont indisponibil')}</td>` : ''}
                   <td class="td-av-desc" data-label="Descriere">${esc(a.description)}</td>
                   <td class="td-hours td-av-amount" data-label="Sumă">${fmtMoney(Number(a.amount) || 0)}</td>
+                  <td data-label="Confirmare">${statusCell}</td>
                   ${editable ? `<td class="td-del">
                     <button class="btn-edit" onclick="editAvans('${a.id}')" aria-label="Editează" title="Editează"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
                     <button class="btn-delete" onclick="deleteAvans('${a.id}')" aria-label="Șterge avansul" title="Șterge">✕</button>
                   </td>` : ''}
-                </tr>`).join('')}
+                </tr>`;
+              }).join('')}
             </tbody>
           </table>`}
     </div>`;
@@ -2496,6 +2509,7 @@ async function addAvans() {
   if (error) { alert(error.message); if (btn) { btn.disabled = false; btn.textContent = 'Adaugă'; } return; }
   allAvansuri.unshift(data);
   cacheAvansuri();
+  updateAvansuriBadge();
   renderAdminTabContent();
 }
 
@@ -2545,6 +2559,57 @@ async function deleteAvans(id) {
 function cacheAvansuri() {
   const userId = getCurrentUser()?.id;
   if (userId) localStorage.setItem('pontaj_avansuri_cache_' + userId, JSON.stringify(allAvansuri));
+}
+
+// A lawyer confirming an avans only ever proves "yes, I received this" —
+// there's no reject, just an acknowledgement so it can't later be disputed
+// as having been added without their knowledge. confirm_avans() is a
+// SECURITY DEFINER RPC that can only set confirmed_at on the caller's own,
+// still-unconfirmed row — it can't touch amount/date/description.
+async function confirmAvans(id) {
+  const user = getCurrentUser();
+  if (!user) return;
+  const a = allAvansuri.find(x => x.id === id);
+  if (!a || a.lawyer_id !== user.id || a.confirmed_at) return;
+  if (!confirm(`Confirmi că ai primit avansul de ${fmtMoney(Number(a.amount)||0)} (${a.description})?`)) return;
+  const btn = document.querySelector(`tr[data-avans-id="${id}"] .btn-primary`);
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  const { data, error } = await db.rpc('confirm_avans', { p_id: id });
+  if (error) { alert(error.message); if (btn) { btn.disabled = false; btn.textContent = 'Confirmă'; } return; }
+  allAvansuri = allAvansuri.map(x => x.id === id ? { ...x, ...data } : x);
+  cacheAvansuri();
+  updateAvansuriBadge();
+  renderAvocatTabContent(user);
+}
+
+// Header badge nudging a lawyer to confirm a pending avans — mirrors
+// updateRequestsBadge/updateBonuriBadge. Shown for any logged-in account
+// (admin included) that has an avans of their own still unconfirmed.
+function updateAvansuriBadge() {
+  const el = document.getElementById('header-avansuri');
+  if (!el) return;
+  const user = getCurrentUser();
+  if (!user) { el.innerHTML = ''; return; }
+  const pending = allAvansuri.filter(a => a.lawyer_id === user.id && !a.confirmed_at).length;
+  if (!pending) { el.innerHTML = ''; return; }
+  el.innerHTML = `<button class="btn-ghost" onclick="goToMyAvansuri()" style="border-color:#d9a441;color:#d9a441" title="Avansuri de confirmat">
+    Avansuri de confirmat: ${pending}
+  </button>`;
+}
+
+// The confirm button only ever appears on the personal (avocat-side)
+// Avansuri view, so an admin currently in admin view mode needs to switch
+// to their own "Pontajul meu" view first before landing on that tab.
+function goToMyAvansuri() {
+  const user = getCurrentUser();
+  if (isAdmin(user) && state.viewMode === 'admin') toggleViewMode();
+  state.avocatTab = 'avansuri';
+  document.querySelectorAll('#main-content .admin-tab').forEach(elx => {
+    const active = elx.dataset.tab === 'avansuri';
+    elx.classList.toggle('active', active);
+    elx.setAttribute('aria-selected', active);
+  });
+  renderAvocatTabContent(user);
 }
 
 function applyPreset() {
