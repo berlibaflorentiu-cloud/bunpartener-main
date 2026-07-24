@@ -915,6 +915,14 @@
     .admin-tab:hover svg { opacity:1; }
     .admin-tab.active { color:var(--gold); border-color:rgba(200,169,110,.55); background:rgba(200,169,110,.12); }
     .admin-tab.active svg { opacity:1; }
+    .tab-notif-bubble {
+      position:absolute; top:-6px; right:-6px;
+      background:var(--gold); color:var(--bg);
+      border-radius:50%; min-width:18px; height:18px; padding:0 4px;
+      font-size:10px; font-weight:700; line-height:1;
+      display:flex; align-items:center; justify-content:center;
+      box-shadow:0 0 0 2px var(--surface);
+    }
 
     /* ── DASHBOARD ── */
     .dash-charts { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:24px; }
@@ -2157,6 +2165,7 @@ function tickTimer() {
 // ═══════════════════════════════════════
 
 function renderAvocat(user) {
+  const pendingAvansuri = allAvansuri.filter(a => a.lawyer_id === user.id && !a.confirmed_at).length;
   const TABS = [
     { key: 'pontaj',     label: 'Pontaj',     icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>' },
     { key: 'cheltuieli', label: 'Cheltuieli', icon: '<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>' },
@@ -2165,7 +2174,11 @@ function renderAvocat(user) {
   ];
   document.getElementById('main-content').innerHTML = `
     <div class="admin-tabs" role="tablist">
-      ${TABS.map(t => `<button class="admin-tab${state.avocatTab===t.key?' active':''}" data-tab="${t.key}" onclick="setAvocatTab('${t.key}')" role="tab" aria-selected="${state.avocatTab===t.key}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${t.icon}</svg>${t.label}</button>`).join('')}
+      ${TABS.map(t => {
+        const bubble = (t.key === 'avansuri' && pendingAvansuri > 0)
+          ? `<span class="tab-notif-bubble" title="${pendingAvansuri} avans${pendingAvansuri===1?'':'uri'} de confirmat">${pendingAvansuri}</span>` : '';
+        return `<button class="admin-tab${state.avocatTab===t.key?' active':''}" style="position:relative" data-tab="${t.key}" onclick="setAvocatTab('${t.key}')" role="tab" aria-selected="${state.avocatTab===t.key}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${t.icon}</svg>${t.label}${bubble}</button>`;
+      }).join('')}
     </div>
     <div id="avocat-tab-content"></div>
   `;
