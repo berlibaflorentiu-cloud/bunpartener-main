@@ -1262,6 +1262,7 @@ let _actFormState     = null;
 let allAtentii        = [];
 let allPersonalAtentii = [];
 let allBonBatches      = [];
+let allAvansuri        = [];
 
 function initDateRange() {
   const now = new Date();
@@ -1368,8 +1369,10 @@ async function register() {
 }
 
 async function logout() {
+  if (currentUser?.id) localStorage.removeItem('pontaj_avansuri_cache_' + currentUser.id);
   await db.auth.signOut();
   currentUser = null; allUsers = []; allEntries = [];
+  allAvansuri = [];
   allClients = []; allInvoices = []; allInvoiceEntries = [];
   state.adminTab = 'pontaj';
   localStorage.removeItem('pontaj_profile');
@@ -1413,6 +1416,7 @@ async function loadAll() {
       allEntries  = JSON.parse(localStorage.getItem('pontaj_entries_cache') || '[]');
       allAtentii  = JSON.parse(localStorage.getItem('pontaj_atentii_cache') || '[]');
       allPersonalAtentii = JSON.parse(localStorage.getItem('pontaj_personal_atentii_cache') || '[]');
+      allAvansuri = JSON.parse(localStorage.getItem('pontaj_avansuri_cache_' + user.id) || '[]');
       showApp();
       // Refresh in background — user already sees the UI
       refreshInBackground(user.id);
@@ -1434,21 +1438,24 @@ async function fetchAndShow(userId) {
     currentUser = profile;
     localStorage.setItem('pontaj_profile', JSON.stringify(profile));
 
-    const [usersRes, entriesRes, atentiiRes, clientsRes] = await dbTimeout(Promise.all([
+    const [usersRes, entriesRes, atentiiRes, clientsRes, avansuriRes] = await dbTimeout(Promise.all([
       db.from('profiles').select('*').order('name'),
       db.from('entries').select('*').order('date', { ascending: false }),
       db.from('atentii').select('*').order('deadline_date'),
       db.from('clients').select('*').order('name'),
+      db.from('avansuri').select('*').order('date', { ascending: false }),
     ]));
     allUsers   = usersRes.data || [];
     allEntries = entriesRes.data || [];
     allAtentii = atentiiRes.data || [];
+    allAvansuri = avansuriRes.data || [];
     // Clients are read-only for avocat accounts too (RLS: clients_avocat_read) —
     // fetched for everyone since the client/dosar autocomplete needs it regardless of role.
     allClients = clientsRes.data || [];
     localStorage.setItem('pontaj_users_cache',   JSON.stringify(allUsers));
     localStorage.setItem('pontaj_entries_cache', JSON.stringify(allEntries));
     localStorage.setItem('pontaj_atentii_cache', JSON.stringify(allAtentii));
+    localStorage.setItem('pontaj_avansuri_cache_' + userId, JSON.stringify(allAvansuri));
 
     if (isAdmin(currentUser)) {
       try {
@@ -1482,12 +1489,13 @@ async function fetchAndShow(userId) {
 
 async function refreshInBackground(userId) {
   try {
-    const [profileRes, usersRes, entriesRes, atentiiRes, clientsRes] = await Promise.all([
+    const [profileRes, usersRes, entriesRes, atentiiRes, clientsRes, avansuriRes] = await Promise.all([
       db.from('profiles').select('*').eq('id', userId).single(),
       db.from('profiles').select('*').order('name'),
       db.from('entries').select('*').order('date', { ascending: false }),
       db.from('atentii').select('*').order('deadline_date'),
       db.from('clients').select('*').order('name'),
+      db.from('avansuri').select('*').order('date', { ascending: false }),
     ]);
     if (profileRes.data) {
       const wasApproved = currentUser?.status === 'approved';
@@ -1499,12 +1507,14 @@ async function refreshInBackground(userId) {
     allUsers   = usersRes.data   || [];
     allEntries = entriesRes.data || [];
     allAtentii = atentiiRes.data || [];
+    allAvansuri = avansuriRes.data || [];
     // Clients are read-only for avocat accounts too (RLS: clients_avocat_read) —
     // fetched for everyone since the client/dosar autocomplete needs it regardless of role.
     allClients = clientsRes.data || [];
     localStorage.setItem('pontaj_users_cache',   JSON.stringify(allUsers));
     localStorage.setItem('pontaj_entries_cache', JSON.stringify(allEntries));
     localStorage.setItem('pontaj_atentii_cache', JSON.stringify(allAtentii));
+    localStorage.setItem('pontaj_avansuri_cache_' + userId, JSON.stringify(allAvansuri));
 
     if (isAdmin(currentUser)) {
       try {
@@ -1970,7 +1980,11 @@ function quickRange(preset) {
     const from = new Date(now); from.setDate(now.getDate() - 29);
     setDateRange(from.toISOString().split('T')[0], today, preset);
   } else if (preset === 'all') {
-    const validDates = allEntries.map(e => e.date).filter(d => d && d >= '2000-01-01');
+    const avansuriActive = isAdmin(currentUser) && state.viewMode === 'admin'
+      ? state.adminTab === 'avansuri'
+      : state.avocatTab === 'avansuri';
+    const validDates = (avansuriActive ? allAvansuri : allEntries)
+      .map(e => e.date).filter(d => d && d >= '2000-01-01');
     const earliest = validDates.length ? validDates.reduce((min, d) => d < min ? d : min, today) : today;
     setDateRange(earliest, today, preset);
   }
@@ -2135,6 +2149,7 @@ function renderAvocat(user) {
   const TABS = [
     { key: 'pontaj',     label: 'Pontaj',     icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>' },
     { key: 'cheltuieli', label: 'Cheltuieli', icon: '<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>' },
+    { key: 'avansuri',   label: 'Avansuri',   icon: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h10M7 14h6"/>' },
     { key: 'atentie',    label: 'Atenție',    icon: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>' },
   ];
   document.getElementById('main-content').innerHTML = `
@@ -2160,6 +2175,7 @@ function renderAvocatTabContent(user) {
   const el = document.getElementById('avocat-tab-content');
   if (!el) return;
   if      (state.avocatTab === 'cheltuieli') renderAvocatCheltuieli(el, user);
+  else if (state.avocatTab === 'avansuri')   renderAvansuri(el, false, user);
   else if (state.avocatTab === 'atentie')    renderAtentie(el);
   else renderAvocatPontaj(el, user);
 }
@@ -2377,6 +2393,150 @@ async function addCheltuiala() {
   allEntries.unshift(data);
   await maybeCreateAtentieFromForm('c', data.id, client, description, user);
   render();
+}
+
+// ── Avansuri — admin CRUD, recipient read-only ──────────
+
+function renderAvansuri(container, editable, user) {
+  const userMap = Object.fromEntries(allUsers.map(u => [u.id, u]));
+  const eligibleUsers = allUsers
+    .filter(u => u.status === 'approved' || !u.status)
+    .slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ro'));
+  const entries = allAvansuri
+    .filter(a => editable || a.lawyer_id === user.id)
+    .filter(a => a.date >= state.dateStart && a.date <= state.dateEnd)
+    .slice().sort((a, b) => b.date.localeCompare(a.date) || (b.created_at || '').localeCompare(a.created_at || ''));
+  const total = entries.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
+
+  container.innerHTML = `
+    <div class="controls" style="flex-direction:column;align-items:flex-start;gap:10px;">
+      ${rangePicker()}
+    </div>
+
+    ${editable ? `
+      <div class="add-form">
+        <div class="form-title">Adaugă avans (MDL)</div>
+        <div class="form-grid cheltuiala-add-grid">
+          <div class="field">
+            <label>Data</label>
+            <input type="date" id="av-date" value="${todayStr()}" max="${todayStr()}">
+          </div>
+          <div class="field">
+            <label>Avocat / Cont</label>
+            <select id="av-lawyer" style="width:100%;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;font-family:inherit">
+              <option value="">— selectează contul —</option>
+              ${eligibleUsers.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label>Sumă (MDL)</label>
+            <input type="number" id="av-amount" min="0.01" step="10" placeholder="ex. 1000">
+          </div>
+          <button class="btn-primary" id="btn-add-avans" style="padding:9px 22px;font-size:14px" onclick="addAvans()">Adaugă</button>
+          <div class="field" style="grid-column:1/-1">
+            <label>Descriere</label>
+            <input type="text" id="av-description" placeholder="ex. Avans pentru luna curentă" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')addAvans()">
+          </div>
+        </div>
+      </div>` : ''}
+
+    <div class="table-wrap">
+      <div class="table-header">
+        <span class="table-title">Avansuri — ${fmtDate(state.dateStart)} — ${fmtDate(state.dateEnd)}</span>
+        <span class="reg-total-badge">Total: ${fmtMoney(total)}</span>
+      </div>
+      ${entries.length === 0
+        ? `<div class="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.3;margin-bottom:12px"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h10M7 14h6"/></svg><p>${editable ? 'Niciun avans pentru această perioadă.<br>Adaugă primul avans din formularul de mai sus.' : 'Nu ai primit niciun avans în perioada selectată.'}</p></div>`
+        : `<table class="entries-table">
+            <thead><tr>
+              <th style="width:110px">Data</th>
+              ${editable ? '<th style="width:190px">Avocat / Cont</th>' : ''}
+              <th>Descriere</th>
+              <th style="width:120px">Sumă</th>
+              ${editable ? '<th style="width:82px"></th>' : ''}
+            </tr></thead>
+            <tbody>
+              ${entries.map(a => `
+                <tr data-avans-id="${a.id}">
+                  <td class="td-date" data-label="Data">${fmtDate(a.date)}</td>
+                  ${editable ? `<td class="td-av-lawyer" data-label="Avocat / Cont" style="color:var(--muted);font-size:13px">${esc(userMap[a.lawyer_id]?.name || 'Cont indisponibil')}</td>` : ''}
+                  <td class="td-av-desc" data-label="Descriere">${esc(a.description)}</td>
+                  <td class="td-hours td-av-amount" data-label="Sumă">${fmtMoney(Number(a.amount) || 0)}</td>
+                  ${editable ? `<td class="td-del">
+                    <button class="btn-edit" onclick="editAvans('${a.id}')" aria-label="Editează" title="Editează"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                    <button class="btn-delete" onclick="deleteAvans('${a.id}')" aria-label="Șterge avansul" title="Șterge">✕</button>
+                  </td>` : ''}
+                </tr>`).join('')}
+            </tbody>
+          </table>`}
+    </div>`;
+}
+
+async function addAvans() {
+  if (!isAdmin(getCurrentUser())) return;
+  const date = document.getElementById('av-date')?.value;
+  const lawyerId = document.getElementById('av-lawyer')?.value;
+  const amount = Number(document.getElementById('av-amount')?.value);
+  const description = document.getElementById('av-description')?.value.trim();
+  if (!date || !lawyerId || !description) { alert('Completează data, avocatul și descrierea avansului.'); return; }
+  if (!Number.isFinite(amount) || amount <= 0) { alert('Completează o sumă validă mai mare decât zero.'); return; }
+  const btn = document.getElementById('btn-add-avans');
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  const { data, error } = await db.from('avansuri').insert({
+    lawyer_id: lawyerId, date, amount, description, created_by: getCurrentUser().id,
+  }).select().single();
+  if (error) { alert(error.message); if (btn) { btn.disabled = false; btn.textContent = 'Adaugă'; } return; }
+  allAvansuri.unshift(data);
+  cacheAvansuri();
+  renderAdminTabContent();
+}
+
+function editAvans(id) {
+  if (!isAdmin(getCurrentUser())) return;
+  const a = allAvansuri.find(x => x.id === id);
+  const row = document.querySelector(`tr[data-avans-id="${id}"]`);
+  if (!a || !row) return;
+  const eligibleUsers = allUsers.filter(u => u.status === 'approved' || !u.status);
+  row.dataset.editing = '1';
+  row.querySelector('.td-date').innerHTML = `<input class="tei" type="date" data-f="date" value="${a.date}" max="${todayStr()}">`;
+  row.querySelector('.td-av-lawyer').innerHTML = `<select class="tei" data-f="lawyer_id">${eligibleUsers.map(u => `<option value="${u.id}"${u.id===a.lawyer_id?' selected':''}>${esc(u.name)}</option>`).join('')}</select>`;
+  row.querySelector('.td-av-desc').innerHTML = `<input class="tei" type="text" data-f="description" value="${esc(a.description)}">`;
+  row.querySelector('.td-av-amount').innerHTML = `<input class="tei" type="number" data-f="amount" min="0.01" step="10" value="${Number(a.amount)}">`;
+  row.querySelector('.td-del').innerHTML = `<button class="btn-edit-save" onclick="saveAvans('${id}')">✓</button><button class="btn-edit-cancel" onclick="renderAdminTabContent()">✕</button>`;
+}
+
+async function saveAvans(id) {
+  if (!isAdmin(getCurrentUser())) return;
+  const row = document.querySelector(`tr[data-avans-id="${id}"]`);
+  if (!row) return;
+  const get = field => row.querySelector(`[data-f="${field}"]`)?.value || '';
+  const updates = {
+    date: get('date'), lawyer_id: get('lawyer_id'), description: get('description').trim(),
+    amount: Number(get('amount')), updated_at: new Date().toISOString(),
+  };
+  if (!updates.date || !updates.lawyer_id || !updates.description || !Number.isFinite(updates.amount) || updates.amount <= 0) {
+    alert('Completează toate câmpurile cu valori valide.'); return;
+  }
+  const { data, error } = await db.from('avansuri').update(updates).eq('id', id).select().single();
+  if (error) { alert(error.message); return; }
+  allAvansuri = allAvansuri.map(a => a.id === id ? data : a);
+  cacheAvansuri();
+  renderAdminTabContent();
+}
+
+async function deleteAvans(id) {
+  if (!isAdmin(getCurrentUser()) || !confirm('Ștergi acest avans?')) return;
+  const { data, error } = await db.from('avansuri').delete().eq('id', id).select();
+  if (error) { alert(error.message); return; }
+  if (!data?.length) { alert('Ștergerea nu a fost permisă.'); return; }
+  allAvansuri = allAvansuri.filter(a => a.id !== id);
+  cacheAvansuri();
+  renderAdminTabContent();
+}
+
+function cacheAvansuri() {
+  const userId = getCurrentUser()?.id;
+  if (userId) localStorage.setItem('pontaj_avansuri_cache_' + userId, JSON.stringify(allAvansuri));
 }
 
 function applyPreset() {
@@ -2650,6 +2810,7 @@ function renderAdmin() {
     site:      '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
     atentie:   '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
     personal:  '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+    avansuri:  '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h10M7 14h6"/>',
   };
   const TABS = [
     { key: 'pontaj',    label: 'Pontaj' },
@@ -2661,6 +2822,7 @@ function renderAdmin() {
     { key: 'site',      label: 'Site' },
     { key: 'atentie',   label: 'Atenție' },
     { key: 'personal',  label: 'Personal' },
+    { key: 'avansuri',  label: 'Avansuri' },
   ];
   document.getElementById('main-content').innerHTML = `
     <div class="admin-tabs" role="tablist">
@@ -2693,6 +2855,7 @@ function renderAdminTabContent() {
   else if (state.adminTab === 'site')      renderSiteStats(el);
   else if (state.adminTab === 'atentie')   renderAtentie(el);
   else if (state.adminTab === 'personal')  renderPersonalAtentii(el);
+  else if (state.adminTab === 'avansuri')  renderAvansuri(el, true, getCurrentUser());
 }
 
 function searchClienti(inputEl) {
