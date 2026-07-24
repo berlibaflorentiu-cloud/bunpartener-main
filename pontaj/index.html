@@ -894,18 +894,26 @@
     #bon-document .bon-footer-print { position: absolute; left: 9mm; bottom: 3.5mm; font-family: "Times New Roman", serif; font-size: 5.8px; color: #333; }
 
     /* ── ADMIN TABS ── */
-    .admin-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:24px; overflow-x:auto; scrollbar-width:none; }
-    .admin-tabs::-webkit-scrollbar { display:none; }
+    .admin-tabs {
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(118px,1fr));
+      gap:8px;
+      margin-bottom:24px;
+      padding:8px;
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:10px;
+    }
     .admin-tab {
-      display:inline-flex; align-items:center; gap:8px;
-      background:none; border:none; border-bottom:2px solid transparent; margin-bottom:-1px;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      min-width:0; background:var(--surface2); border:1px solid transparent; border-radius:7px;
       color:var(--muted); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500;
-      padding:10px 20px; cursor:pointer; transition:color .15s,border-color .15s; white-space:nowrap; flex-shrink:0;
+      padding:10px 12px; cursor:pointer; transition:color .15s,border-color .15s,background .15s; white-space:nowrap;
     }
     .admin-tab svg { flex-shrink:0; opacity:.7; transition:opacity .15s; }
-    .admin-tab:hover { color:var(--text); }
+    .admin-tab:hover { color:var(--text); background:rgba(200,169,110,.08); }
     .admin-tab:hover svg { opacity:1; }
-    .admin-tab.active { color:var(--gold); border-color:var(--gold); }
+    .admin-tab.active { color:var(--gold); border-color:rgba(200,169,110,.55); background:rgba(200,169,110,.12); }
     .admin-tab.active svg { opacity:1; }
 
     /* ── DASHBOARD ── */
