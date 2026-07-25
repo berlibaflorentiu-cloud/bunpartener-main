@@ -923,17 +923,17 @@
     .admin-tab.active svg { opacity:1; }
     .admin-tab-config {
       position:absolute;
-      top:-13px;
-      right:-13px;
+      top:-10px;
+      right:-10px;
       z-index:2;
-      width:34px;
-      height:34px;
-      min-width:34px;
+      width:28px;
+      height:28px;
+      min-width:28px;
       padding:0;
       border-radius:50%;
       border-color:var(--border);
       background:var(--surface2);
-      box-shadow:0 4px 14px rgba(0,0,0,.28);
+      box-shadow:0 3px 10px rgba(0,0,0,.24);
     }
     .admin-tab-config:hover { border-color:var(--gold); color:var(--gold); }
     .tab-notif-bubble {
@@ -3084,7 +3084,7 @@ function renderAdmin() {
   document.getElementById('main-content').innerHTML = `
     <div class="admin-tabs" role="tablist">
       ${TABS.map(t => `<button class="admin-tab${state.adminTab===t.key?' active':''}" data-tab="${t.key}" onclick="setAdminTab('${t.key}')" role="tab" aria-selected="${state.adminTab===t.key}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TAB_ICON[t.key]}</svg>${t.label}</button>`).join('')}
-      <button class="admin-tab admin-tab-config" onclick="openAdminTabSettings()" type="button" title="Aranjează și ascunde file" aria-label="Personalizează filele"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.12 2.12-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.55V20.3h-3v-.09a1.7 1.7 0 0 0-1.03-1.55 1.7 1.7 0 0 0-1.88.34l-.06.06-2.12-2.12.06-.06A1.7 1.7 0 0 0 7 15a1.7 1.7 0 0 0-1.55-1.03H5.3v-3h.15A1.7 1.7 0 0 0 7 9.94a1.7 1.7 0 0 0-.34-1.88L6.6 8l2.12-2.12.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 11.7 4.7V4.6h3v.1a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 8l-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.55 1.03h.15v3h-.15A1.7 1.7 0 0 0 19.4 15Z"/></svg></button>
+      <button class="admin-tab admin-tab-config" onclick="openAdminTabSettings()" type="button" title="Aranjează și ascunde file" aria-label="Personalizează filele"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
     </div>
     <div id="admin-tab-content"></div>
   `;
