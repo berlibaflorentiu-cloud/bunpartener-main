@@ -733,7 +733,7 @@
       }
       /* Two A5 Bon copies are stacked on one A4 portrait sheet for cutting. */
       #bon-document { page: bon-page; margin: 0 auto; }
-      #bon-document.bon-scan-document { width: 210mm; height: 297mm; }
+      #bon-document.bon-scan-document { width: 210mm; height: 296mm; }
       @page bon-page { size: A4 portrait; margin: 0; }
     }
 
@@ -777,19 +777,19 @@
     }
     #bon-document.bon-scan-document {
       width: 210mm;
-      height: 297mm;
+      height: 296mm;
       padding: 0;
       border: 0;
     }
     #bon-document .bon-template-canvas {
       display: block;
       width: 210mm;
-      height: 148.5mm;
+      height: 148mm;
     }
     #bon-document .bon-copy {
       position: relative;
       width: 210mm;
-      height: 148.5mm;
+      height: 148mm;
       overflow: hidden;
     }
     #bon-document .bon-copy .bon-template-canvas {
@@ -838,7 +838,7 @@
     #bon-document .bon-cut-line {
       position: absolute;
       z-index: 3;
-      top: 148.5mm;
+      top: 148mm;
       left: 0;
       width: 210mm;
       height: 0;
@@ -5375,6 +5375,7 @@ async function downloadBonPDF(id) {
     image:    { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 3, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' },
     jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['avoid-all'] },
   }).from(el).save();
 }
 
