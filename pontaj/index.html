@@ -4594,8 +4594,8 @@ function renderRegistru(container) {
       <div class="form-title">Înregistrare nouă</div>
       <div class="reg-form-grid">
         <div class="field">
-          <label>Seria și Nr.</label>
-          <input type="text" id="rg-serie" placeholder="ex. DAA58646046" autocomplete="off" autocorrect="off" spellcheck="false">
+          <label>Seria și Nr. (opțional)</label>
+          <input type="text" id="rg-serie" placeholder="se atribuie la generarea bonului" autocomplete="off" autocorrect="off" spellcheck="false">
         </div>
         <div class="field">
           <label>Data</label>
@@ -4686,7 +4686,7 @@ function _regRow(r, nr) {
   return `
     <tr data-receipt-id="${r.id}">
       <td class="reg-nr">${nr}</td>
-      <td style="font-weight:600;font-size:13px">${esc(r.serie_nr)}</td>
+      <td style="font-weight:600;font-size:13px">${esc(r.serie_nr) || '—'}</td>
       <td class="td-date">${fmtDate(r.date)}</td>
       <td>${esc(r.client_name)}</td>
       <td style="color:var(--muted);font-size:12px">${esc(r.cod_personal)||'—'}</td>
@@ -4724,7 +4724,6 @@ async function addReceipt() {
   const baza     = parseFloat(document.getElementById('rg-baza').value) || 0;
   const comp     = parseFloat(document.getElementById('rg-comp').value) || 0;
   const currency = document.getElementById('rg-currency')?.value || 'MDL';
-  if (!serie)  { alert('Completați Seria și Nr.'); return; }
   if (!date)   { alert('Selectați data.'); return; }
   if (!client) { alert('Completați numele clientului.'); return; }
   const btn = document.querySelector('#rg-serie')?.closest('.add-form')?.querySelector('.btn-primary');
@@ -4803,7 +4802,6 @@ async function saveReceiptEdit(id) {
     compensare:   parseFloat(get('compensare'))  || 0,
     currency:     row.dataset.currency || 'MDL',
   };
-  if (!updates.serie_nr)    { alert('Seria și Nr. este obligatorie.'); return; }
   if (!updates.client_name) { alert('Numele clientului este obligatoriu.'); return; }
   const saveBtn = row.querySelector('.btn-edit-save');
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '...'; }
