@@ -5345,7 +5345,7 @@ async function openBonPrintView(id) {
   document.getElementById('modal-title').textContent = `Bon ${r.serie_nr || ''}`;
   document.getElementById('modal-actions').innerHTML = `
     <button class="btn-ghost" onclick="downloadBonPDF('${r.id}')">Descarcă PDF</button>
-    <button class="btn-ghost" onclick="window.print()">Tipărește</button>
+    <button class="btn-ghost" onclick="printBonPDF('${r.id}')">Tipărește</button>
     <button class="btn-ghost" onclick="closeModal()">✕</button>
   `;
   document.getElementById('modal-body').innerHTML = `
@@ -5360,23 +5360,57 @@ async function openBonPrintView(id) {
   }
 }
 
-async function downloadBonPDF(id) {
+function _bonPdfContext(id) {
   const el = document.getElementById('bon-document');
-  if (!el) return;
+  if (!el) return null;
   const canvases = [...el.querySelectorAll('.bon-template-canvas')];
   if (canvases.length !== 2 || canvases.some(canvas => canvas.dataset.ready !== '1')) {
     alert('Șablonul bonului încă se încarcă. Încercați din nou peste o clipă.');
-    return;
+    return null;
   }
   const r = allReceipts.find(x => x.id === id);
-  html2pdf().set({
+  return { el, r };
+}
+
+function _bonPdfOptions(r) {
+  return {
     margin: [0, 0, 0, 0],
     filename: `bon-${(r?.serie_nr || 'plata').replace(/\s+/g,'-')}.pdf`,
     image:    { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 3, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' },
     jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
     pagebreak: { mode: ['avoid-all'] },
-  }).from(el).save();
+  };
+}
+
+async function downloadBonPDF(id) {
+  const ctx = _bonPdfContext(id);
+  if (!ctx) return;
+  html2pdf().set(_bonPdfOptions(ctx.r)).from(ctx.el).save();
+}
+
+async function printBonPDF(id) {
+  const ctx = _bonPdfContext(id);
+  if (!ctx) return;
+
+  // Open synchronously so browsers do not block the PDF viewer as a popup.
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('Permite ferestrele pop-up pentru a tipări bonul.');
+    return;
+  }
+  printWindow.document.write('<p style="font-family:Arial,sans-serif;padding:24px">Se pregătește bonul pentru tipărire...</p>');
+
+  try {
+    // Build the exact same jsPDF document as Descarcă PDF, then add jsPDF's
+    // print instruction before opening it in the browser PDF viewer.
+    const pdf = await html2pdf().set(_bonPdfOptions(ctx.r)).from(ctx.el).toPdf().get('pdf');
+    if (typeof pdf.autoPrint === 'function') pdf.autoPrint();
+    printWindow.location.href = pdf.output('bloburl');
+  } catch (error) {
+    printWindow.close();
+    alert('Nu s-a putut pregăti bonul pentru tipărire: ' + error.message);
+  }
 }
 
 // ── Delete a generated Bon ───────────────────────────────
