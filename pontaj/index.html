@@ -784,12 +784,12 @@
     #bon-document .bon-template-canvas {
       display: block;
       width: 210mm;
-      height: 148mm;
+      height: 148.5mm;
     }
     #bon-document .bon-copy {
       position: relative;
       width: 210mm;
-      height: 148mm;
+      height: 148.5mm;
       overflow: hidden;
     }
     #bon-document .bon-copy .bon-template-canvas {
@@ -836,10 +836,15 @@
       }
     }
     #bon-document .bon-cut-line {
+      position: absolute;
+      z-index: 3;
+      top: 148.5mm;
+      left: 0;
       width: 210mm;
-      height: 1mm;
+      height: 0;
       border-top: .2mm dashed #999;
       box-sizing: border-box;
+      pointer-events: none;
     }
     #bon-document .bon-formular-tip {
       text-align: right;
