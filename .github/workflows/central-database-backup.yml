@@ -1,0 +1,51 @@
+name: Central encrypted database backup
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_check_only:
+        description: Validate the BunPartener source connection without creating a backup
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: central-database-backup-bunpartener
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Create, encrypt, and upload backup
+        if: ${{ !inputs.source_check_only }}
+        env:
+          SOURCE_DB_URL: ${{ secrets.BUNPARTENER_BACKUP_DB_URL }}
+          BACKUP_SUPABASE_URL: ${{ secrets.CENTRAL_BACKUP_SUPABASE_URL }}
+          BACKUP_SUPABASE_SERVICE_KEY: ${{ secrets.CENTRAL_BACKUP_SERVICE_KEY }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.CENTRAL_BACKUP_ENCRYPTION_KEY }}
+        run: bash scripts/create-central-backup.sh
+
+      - name: Validate source backup access
+        if: ${{ inputs.source_check_only }}
+        env:
+          SOURCE_DB_URL: ${{ secrets.BUNPARTENER_BACKUP_DB_URL }}
+        run: |
+          psql "$SOURCE_DB_URL" --no-psqlrc --set=ON_ERROR_STOP=1 --tuples-only --command="select count(*) >= 0 from public.clients; select count(*) >= 0 from auth.users;"
+          pg_dump --dbname="$SOURCE_DB_URL" --schema-only --no-owner --no-acl --file=/tmp/bunpartener-schema.sql
+          test -s /tmp/bunpartener-schema.sql
