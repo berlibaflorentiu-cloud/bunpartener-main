@@ -24,6 +24,54 @@ function safeEqual(left: string, right: string) {
   return difference === 0;
 }
 
+async function sendUsageThresholdAlert(admin: ReturnType<typeof createClient>) {
+  const { data: claim, error: claimError } = await admin.rpc("claim_backup_usage_alert", {
+    p_step_bytes: 100 * 1024 * 1024,
+  });
+  if (claimError) return { sent: false, error: claimError.message };
+  if (!claim?.claimed) return { sent: false, usage_bytes: Number(claim?.usage_bytes ?? 0) };
+
+  const thresholdBytes = Number(claim.threshold_bytes);
+  const usageBytes = Number(claim.usage_bytes);
+  const thresholdMiB = Math.round(thresholdBytes / 1024 / 1024);
+  const usageMiB = (usageBytes / 1024 / 1024).toFixed(2);
+  const usagePercent = (usageBytes / 1024 / 1024 / 1024 * 100).toFixed(1);
+  const { data: resendKey, error: keyError } = await admin.rpc("get_backup_resend_api_key");
+
+  if (keyError || typeof resendKey !== "string") {
+    await admin.rpc("release_backup_usage_alert", { p_threshold_bytes: thresholdBytes });
+    return { sent: false, error: keyError?.message ?? "Missing Resend key" };
+  }
+
+  const emailResponse = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${resendKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "Central Backup <onboarding@resend.dev>",
+      to: ["berlibaflorentiu@gmail.com"],
+      subject: `Avertizare backup: ${thresholdMiB} MiB utilizați`,
+      html: `<p>Proiectul central de backup a depășit pragul de <strong>${thresholdMiB} MiB</strong>.</p>`
+        + `<p>Utilizare curentă: <strong>${usageMiB} MiB</strong> (${usagePercent}% din cota de 1 GiB).</p>`
+        + "<p>Următoarea notificare va fi trimisă după încă 100 MiB utilizați.</p>",
+    }),
+  });
+
+  if (!emailResponse.ok) {
+    const detail = await emailResponse.text();
+    await admin.rpc("release_backup_usage_alert", { p_threshold_bytes: thresholdBytes });
+    return { sent: false, error: `Resend ${emailResponse.status}: ${detail}` };
+  }
+
+  const { error: completeError } = await admin.rpc("complete_backup_usage_alert", {
+    p_threshold_bytes: thresholdBytes,
+  });
+  if (completeError) return { sent: true, error: completeError.message, threshold_bytes: thresholdBytes };
+  return { sent: true, threshold_bytes: thresholdBytes, usage_bytes: usageBytes };
+}
+
 Deno.serve(async (request) => {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
@@ -189,7 +237,14 @@ Deno.serve(async (request) => {
       if (!removeError) await admin.from("backup_catalog").delete().eq("id", row.id);
     }
 
-    return json({ verified: true, retained: Math.min(verifiedRows?.length ?? 1, retentionCount) });
+    const usageAlert = await sendUsageThresholdAlert(admin);
+    if (usageAlert.error) console.error("Backup usage alert error:", usageAlert.error);
+
+    return json({
+      verified: true,
+      retained: Math.min(verifiedRows?.length ?? 1, retentionCount),
+      usage_alert: usageAlert,
+    });
   }
 
   return json({ error: "Unknown action" }, 400);
