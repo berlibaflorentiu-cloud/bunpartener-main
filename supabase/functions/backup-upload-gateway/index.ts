@@ -4,8 +4,9 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 const bucket = "database-backups";
 const maxBackupBytes = 50 * 1024 * 1024;
 const retentionCount = 15;
-const sources: Record<string, string> = {
-  beuseulqtgtesavswxyy: "bunpartener-pontaj",
+const sources: Record<string, { slug: string }> = {
+  beuseulqtgtesavswxyy: { slug: "bunpartener-pontaj" },
+  ildoegipvcgxboijfksw: { slug: "attp-pontaj" },
 };
 
 const json = (body: unknown, status = 200) =>
@@ -30,15 +31,6 @@ Deno.serve(async (request) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceKey) return json({ error: "Gateway is not configured" }, 500);
 
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data: expectedSecret, error: secretError } = await admin.rpc("get_backup_gateway_secret");
-  const suppliedSecret = request.headers.get("x-backup-secret") ?? "";
-  if (secretError || typeof expectedSecret !== "string" || !safeEqual(suppliedSecret, expectedSecret)) {
-    return json({ error: "Unauthorized" }, 401);
-  }
-
   let body: Record<string, unknown>;
   try {
     body = await request.json();
@@ -48,8 +40,20 @@ Deno.serve(async (request) => {
 
   const action = String(body.action ?? "");
   const sourceProjectRef = String(body.source_project_ref ?? "");
-  const projectSlug = sources[sourceProjectRef];
-  if (!projectSlug) return json({ error: "Source project is not allowed" }, 403);
+  const source = sources[sourceProjectRef];
+
+  const admin = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: expectedSecret, error: secretError } = source
+    ? await admin.rpc("get_backup_gateway_secret", { p_source_project_ref: sourceProjectRef })
+    : { data: null, error: null };
+  const suppliedSecret = request.headers.get("x-backup-secret") ?? "";
+  if (secretError || typeof expectedSecret !== "string" || !safeEqual(suppliedSecret, expectedSecret)) {
+    return json({ error: "Unauthorized" }, 401);
+  }
+
+  const projectSlug = source.slug;
 
   const backupDate = String(body.backup_date ?? "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(backupDate)) return json({ error: "Invalid backup date" }, 400);
@@ -119,7 +123,7 @@ Deno.serve(async (request) => {
   if (action === "confirm") {
     const { data: registered, error: registeredError } = await admin
       .from("backup_catalog")
-      .select("encrypted_bytes,status")
+      .select("encrypted_bytes,encrypted_sha256,status")
       .eq("source_project_ref", sourceProjectRef)
       .eq("backup_date", backupDate)
       .maybeSingle();
@@ -133,6 +137,35 @@ Deno.serve(async (request) => {
     const storedBytes = Number(backupObject?.metadata?.size ?? 0);
     if (!backupObject || !metadataObject || storedBytes !== Number(registered.encrypted_bytes)) {
       return json({ error: "Uploaded objects are missing or their size does not match" }, 422);
+    }
+
+    const [backupDownload, metadataDownload] = await Promise.all([
+      admin.storage.from(bucket).download(objectPath),
+      admin.storage.from(bucket).download(metadataPath),
+    ]);
+    if (backupDownload.error || metadataDownload.error || !backupDownload.data || !metadataDownload.data) {
+      return json({ error: "Uploaded objects could not be read for integrity verification" }, 422);
+    }
+
+    const digest = await crypto.subtle.digest("SHA-256", await backupDownload.data.arrayBuffer());
+    const storedSha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    let metadata: Record<string, unknown> | null = null;
+    try {
+      metadata = JSON.parse(await metadataDownload.data.text());
+    } catch {
+      metadata = null;
+    }
+    const integrityMatches = safeEqual(storedSha256, String(registered.encrypted_sha256))
+      && metadata?.source_project_ref === sourceProjectRef
+      && metadata?.encrypted_sha256 === registered.encrypted_sha256
+      && Number(metadata?.encrypted_bytes) === Number(registered.encrypted_bytes);
+    if (!integrityMatches) {
+      await admin.from("backup_catalog").update({
+        status: "failed",
+        failure_reason: "Integrity verification failed",
+      }).eq("source_project_ref", sourceProjectRef).eq("backup_date", backupDate);
+      await admin.storage.from(bucket).remove([objectPath, metadataPath]);
+      return json({ error: "Backup integrity verification failed" }, 422);
     }
 
     const { error: verifyError } = await admin.from("backup_catalog").update({
