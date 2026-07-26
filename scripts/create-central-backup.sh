@@ -5,7 +5,7 @@ if [[ -d /usr/lib/postgresql/17/bin ]]; then
   PATH="/usr/lib/postgresql/17/bin:$PATH"
 fi
 
-required=(SOURCE_DB_URL BACKUP_SUPABASE_URL BACKUP_SUPABASE_SERVICE_KEY BACKUP_ENCRYPTION_KEY)
+required=(SOURCE_DB_URL BACKUP_SUPABASE_URL BACKUP_SUPABASE_PUBLISHABLE_KEY BACKUP_GATEWAY_SECRET BACKUP_ENCRYPTION_KEY)
 for name in "${required[@]}"; do
   if [[ -z "${!name:-}" ]]; then
     echo "Missing required secret: ${name}" >&2
@@ -15,7 +15,6 @@ done
 
 project_slug="bunpartener-pontaj"
 source_project_ref="beuseulqtgtesavswxyy"
-backup_bucket="database-backups"
 local_date="$(TZ=Europe/Chisinau date +%F)"
 created_at="$(date -u +%FT%TZ)"
 work_dir="$(mktemp -d)"
@@ -60,27 +59,45 @@ openssl enc -aes-256-cbc -salt -pbkdf2 -iter 250000 \
   -pass env:BACKUP_ENCRYPTION_KEY
 
 encrypted_sha256="$(sha256sum "$encrypted_file" | cut -d' ' -f1)"
-object_path="${project_slug}/${source_project_ref}/${local_date}/${project_slug}-${local_date}.tar.gz.enc"
-metadata_path="${project_slug}/${source_project_ref}/${local_date}/upload.json"
-
-echo "Uploading encrypted backup to ${object_path}..."
-curl --fail --silent --show-error \
-  -X POST "${BACKUP_SUPABASE_URL}/storage/v1/object/${backup_bucket}/${object_path}" \
-  -H "Authorization: Bearer ${BACKUP_SUPABASE_SERVICE_KEY}" \
-  -H "apikey: ${BACKUP_SUPABASE_SERVICE_KEY}" \
-  -H "Content-Type: application/octet-stream" \
-  -H "x-upsert: false" \
-  --data-binary "@${encrypted_file}"
+encrypted_bytes="$(wc -c < "$encrypted_file" | tr -d ' ')"
+gateway_url="${BACKUP_SUPABASE_URL}/functions/v1/backup-upload-gateway"
 
 printf '{"source_project_ref":"%s","created_at":"%s","encrypted_sha256":"%s","encrypted_bytes":%s}\n' \
-  "$source_project_ref" "$created_at" "$encrypted_sha256" "$(wc -c < "$encrypted_file" | tr -d ' ')" > "$work_dir/upload.json"
-curl --fail --silent --show-error \
-  -X POST "${BACKUP_SUPABASE_URL}/storage/v1/object/${backup_bucket}/${metadata_path}" \
-  -H "Authorization: Bearer ${BACKUP_SUPABASE_SERVICE_KEY}" \
-  -H "apikey: ${BACKUP_SUPABASE_SERVICE_KEY}" \
-  -H "Content-Type: application/json" \
-  -H "x-upsert: false" \
-  --data-binary "@$work_dir/upload.json"
+  "$source_project_ref" "$created_at" "$encrypted_sha256" "$encrypted_bytes" > "$work_dir/upload.json"
 
-echo "Backup uploaded successfully: ${object_path}"
+sign_payload="$(jq -n \
+  --arg source_project_ref "$source_project_ref" \
+  --arg backup_date "$local_date" \
+  --arg encrypted_sha256 "$encrypted_sha256" \
+  --argjson encrypted_bytes "$encrypted_bytes" \
+  '{action:"sign",source_project_ref:$source_project_ref,backup_date:$backup_date,encrypted_sha256:$encrypted_sha256,encrypted_bytes:$encrypted_bytes}')"
+sign_response="$(curl --fail-with-body --silent --show-error \
+  -X POST "$gateway_url" \
+  -H "Content-Type: application/json" \
+  -H "x-backup-secret: ${BACKUP_GATEWAY_SECRET}" \
+  --data "$sign_payload")"
+
+backup_bucket="$(jq -er '.bucket' <<< "$sign_response")"
+backup_path="$(jq -er '.backup.path' <<< "$sign_response")"
+backup_token="$(jq -er '.backup.token' <<< "$sign_response")"
+metadata_path="$(jq -er '.metadata.path' <<< "$sign_response")"
+metadata_token="$(jq -er '.metadata.token' <<< "$sign_response")"
+
+echo "Uploading encrypted backup to ${backup_path}..."
+BACKUP_BUCKET="$backup_bucket" node scripts/upload-signed-backup.mjs \
+  "$encrypted_file" "$work_dir/upload.json" \
+  "$backup_path" "$backup_token" "$metadata_path" "$metadata_token"
+
+confirm_payload="$(jq -n \
+  --arg source_project_ref "$source_project_ref" \
+  --arg backup_date "$local_date" \
+  '{action:"confirm",source_project_ref:$source_project_ref,backup_date:$backup_date}')"
+confirm_response="$(curl --fail-with-body --silent --show-error \
+  -X POST "$gateway_url" \
+  -H "Content-Type: application/json" \
+  -H "x-backup-secret: ${BACKUP_GATEWAY_SECRET}" \
+  --data "$confirm_payload")"
+jq -e '.verified == true' <<< "$confirm_response" >/dev/null
+
+echo "Backup uploaded and verified successfully: ${backup_path}"
 echo "Encrypted SHA-256: ${encrypted_sha256}"
