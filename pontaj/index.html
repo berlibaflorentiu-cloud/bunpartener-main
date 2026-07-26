@@ -7,6 +7,8 @@
   <title>Pontaj — Evidență Ore Facturabile</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
@@ -5596,26 +5598,74 @@ function _bonPdfContext(id) {
   return { el, r };
 }
 
-function _bonPdfOptions(r) {
-  return {
-    margin: [0, 0, 0, 0],
-    filename: `bon-${(r?.serie_nr || 'plata').replace(/\s+/g,'-')}.pdf`,
-    image:    { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 3, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' },
-    jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
-  };
+function _bonPdfFilename(r) {
+  return `bon-${(r?.serie_nr || 'plata').replace(/\s+/g, '-')}.pdf`;
+}
+
+async function _bonRenderCopyForPdf(copy) {
+  const rect = copy.getBoundingClientRect();
+  if (!rect.width || !rect.height) throw new Error('Previzualizarea bonului nu are dimensiuni valide.');
+
+  // The source scan is 1489 × 1050. Capture each A5 copy independently at
+  // that exact resolution. This deliberately bypasses html2pdf's pagination,
+  // which can insert a blank offset and split the second copy across pages.
+  const scale = 1489 / rect.width;
+  return html2canvas(copy, {
+    scale,
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: '#ffffff',
+    logging: false,
+    onclone: clonedDocument => {
+      clonedDocument.querySelectorAll('.bon-edit-field').forEach(field => {
+        field.contentEditable = 'false';
+        field.style.background = 'transparent';
+        field.style.boxShadow = 'none';
+        field.style.outline = 'none';
+      });
+    },
+  });
+}
+
+async function _buildBonPdfDocument(id) {
+  const ctx = _bonPdfContext(id);
+  if (!ctx) return null;
+  if (document.activeElement?.classList?.contains('bon-edit-field')) document.activeElement.blur();
+  if (document.fonts?.ready) await document.fonts.ready;
+
+  const copies = [...ctx.el.querySelectorAll('.bon-copy')];
+  if (copies.length !== 2) throw new Error('Bonul trebuie să conțină exact două exemplare A5.');
+  const JsPdf = window.jspdf?.jsPDF || window.jsPDF;
+  if (!JsPdf) throw new Error('Generatorul PDF nu este disponibil.');
+
+  const firstCopy = await _bonRenderCopyForPdf(copies[0]);
+  const secondCopy = await _bonRenderCopyForPdf(copies[1]);
+  const pdf = new JsPdf({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+
+  // Exact physical placement: two independent A5 landscapes on one A4
+  // portrait page. No DOM-flow measurement is allowed to influence the PDF.
+  pdf.addImage(firstCopy, 'JPEG', 0, 0, 210, 148, undefined, 'FAST');
+  pdf.addImage(secondCopy, 'JPEG', 0, 148, 210, 148, undefined, 'FAST');
+  pdf.setDrawColor(145, 145, 145);
+  pdf.setLineWidth(0.2);
+  if (typeof pdf.setLineDashPattern === 'function') pdf.setLineDashPattern([1.2, 1.2], 0);
+  pdf.line(0, 148, 210, 148);
+  if (typeof pdf.setLineDashPattern === 'function') pdf.setLineDashPattern([], 0);
+
+  return { pdf, receipt: ctx.r };
 }
 
 async function downloadBonPDF(id) {
-  const ctx = _bonPdfContext(id);
-  if (!ctx) return;
-  html2pdf().set(_bonPdfOptions(ctx.r)).from(ctx.el).save();
+  try {
+    const built = await _buildBonPdfDocument(id);
+    if (!built) return;
+    built.pdf.save(_bonPdfFilename(built.receipt));
+  } catch (error) {
+    alert('Nu s-a putut genera PDF-ul bonului: ' + error.message);
+  }
 }
 
 async function printBonPDF(id) {
-  const ctx = _bonPdfContext(id);
-  if (!ctx) return;
-
   // Open synchronously so browsers do not block the PDF viewer as a popup.
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
@@ -5625,11 +5675,13 @@ async function printBonPDF(id) {
   printWindow.document.write('<p style="font-family:Arial,sans-serif;padding:24px">Se pregătește bonul pentru tipărire...</p>');
 
   try {
-    // Build the exact same jsPDF document as Descarcă PDF, then add jsPDF's
-    // print instruction before opening it in the browser PDF viewer.
-    const pdf = await html2pdf().set(_bonPdfOptions(ctx.r)).from(ctx.el).toPdf().get('pdf');
-    if (typeof pdf.autoPrint === 'function') pdf.autoPrint();
-    printWindow.location.href = pdf.output('bloburl');
+    // Print and download consume the same fixed-coordinate PDF builder, so
+    // their layouts cannot drift apart.
+    const built = await _buildBonPdfDocument(id);
+    if (!built) { printWindow.close(); return; }
+    if (typeof built.pdf.autoPrint === 'function') built.pdf.autoPrint();
+    const blobUrl = URL.createObjectURL(built.pdf.output('blob'));
+    printWindow.location.replace(blobUrl);
   } catch (error) {
     printWindow.close();
     alert('Nu s-a putut pregăti bonul pentru tipărire: ' + error.message);
