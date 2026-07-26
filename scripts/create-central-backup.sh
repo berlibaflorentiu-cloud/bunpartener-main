@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ -d /usr/lib/postgresql/17/bin ]]; then
+  PATH="/usr/lib/postgresql/17/bin:$PATH"
+fi
+
 required=(SOURCE_DB_URL BACKUP_SUPABASE_URL BACKUP_SUPABASE_SERVICE_KEY BACKUP_ENCRYPTION_KEY)
 for name in "${required[@]}"; do
   if [[ -z "${!name:-}" ]]; then
@@ -80,4 +84,3 @@ curl --fail --silent --show-error \
 
 echo "Backup uploaded successfully: ${object_path}"
 echo "Encrypted SHA-256: ${encrypted_sha256}"
-
