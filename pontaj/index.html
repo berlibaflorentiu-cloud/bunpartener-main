@@ -6726,6 +6726,7 @@ function showClientReceipts(clientId, event) {
               <th>Ore</th>
               <th>Total</th>
               <th>Total (curs BNM)</th>
+              <th>Impozit (12%)</th>
               <th></th>
             </tr></thead>
             <tbody>
@@ -6735,6 +6736,7 @@ function showClientReceipts(clientId, event) {
                   Number(r.total_eur) > 0 ? Number(r.total_eur).toLocaleString('ro-RO', {maximumFractionDigits:2}) + ' EUR' : null,
                 ].filter(Boolean).join(' + ') || '—';
                 const bnmDisplay = r.total_mdl_complete != null ? fmtMoney(Number(r.total_mdl_complete)) : '—';
+                const impozitDisplay = r.total_mdl_complete != null ? fmtMoney(Number(r.total_mdl_complete) * 0.12) : '—';
                 return `<tr data-report-id="${r.id}">
                   <td class="reg-nr">${i+1}</td>
                   <td class="td-date">${r.created_at ? fmtDate(r.created_at.split('T')[0]) : '—'}</td>
@@ -6743,6 +6745,7 @@ function showClientReceipts(clientId, event) {
                   <td class="reg-money">${r.total_hours > 0 ? Number(r.total_hours).toFixed(1) + 'h' : '—'}</td>
                   <td class="reg-total">${totalDisplay}</td>
                   <td class="reg-total">${bnmDisplay}</td>
+                  <td class="reg-total">${impozitDisplay}</td>
                   <td class="td-del">
                     <button class="btn-edit" onclick="viewSavedReport('${r.id}')" aria-label="Deschide actul" title="Deschide"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg></button>
                     <button class="btn-edit" onclick="editClientReport('${r.id}')" aria-label="Editează datele" title="Editează datele"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
