@@ -25,6 +25,9 @@ function safeEqual(left: string, right: string) {
 }
 
 async function sendUsageThresholdAlert(admin: ReturnType<typeof createClient>) {
+  const alertRecipient = Deno.env.get("BACKUP_ALERT_RECIPIENT");
+  if (!alertRecipient) return { sent: false, error: "Missing BACKUP_ALERT_RECIPIENT" };
+
   const { data: claim, error: claimError } = await admin.rpc("claim_backup_usage_alert", {
     p_step_bytes: 100 * 1024 * 1024,
   });
@@ -51,7 +54,7 @@ async function sendUsageThresholdAlert(admin: ReturnType<typeof createClient>) {
     },
     body: JSON.stringify({
       from: "Central Backup <onboarding@resend.dev>",
-      to: ["berlibaflorentiu@gmail.com"],
+      to: [alertRecipient],
       subject: `Avertizare backup: ${thresholdMiB} MiB utilizați`,
       html: `<p>Proiectul central de backup a depășit pragul de <strong>${thresholdMiB} MiB</strong>.</p>`
         + `<p>Utilizare curentă: <strong>${usageMiB} MiB</strong> (${usagePercent}% din cota de 1 GiB).</p>`
