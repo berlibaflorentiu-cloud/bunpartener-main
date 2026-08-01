@@ -1967,6 +1967,47 @@ function fmtEarnings({ eur, mdl }) {
   return parts.join(' + ') || '—';
 }
 
+// Compact labels (group chips, filter titles) show just the first name, which
+// is ambiguous when two people share one — e.g. two Vasiles. For those, append
+// the shortest surname prefix that tells them apart ("Vasile C." / "Vasile P.").
+function _firstNameOf(u)   { return (u?.name || '').trim().split(/\s+/)[0] || (u?.name || ''); }
+function _surnameRestOf(u) { return (u?.name || '').trim().split(/\s+/).slice(1).join(' '); }
+
+function shortNamesFor(users) {
+  const out = {};
+  const byFirst = {};
+  users.forEach(u => {
+    const key = _firstNameOf(u).toLowerCase();
+    (byFirst[key] = byFirst[key] || []).push(u);
+  });
+  Object.values(byFirst).forEach(group => {
+    if (group.length === 1) { out[group[0].id] = _firstNameOf(group[0]); return; }
+    const maxLen = Math.max(0, ...group.map(u => _surnameRestOf(u).length));
+    // Grow the prefix until every colliding name is distinguishable.
+    let k = 1;
+    for (; k < maxLen; k++) {
+      const seen = new Set(group.map(u => _surnameRestOf(u).slice(0, k).toLowerCase()));
+      if (seen.size === group.length) break;
+    }
+    group.forEach(u => {
+      const rest = _surnameRestOf(u);
+      const suffix = rest.slice(0, k);
+      if (!suffix) { out[u.id] = _firstNameOf(u); return; }
+      // Abbreviation dot only when it really is an abbreviation.
+      out[u.id] = `${_firstNameOf(u)} ${suffix}${suffix.length < rest.length ? '.' : ''}`;
+    });
+  });
+  return out;
+}
+
+// Disambiguated against every known account, so a name stays stable no matter
+// which subset of lawyers a particular view happens to render.
+function shortName(userOrId) {
+  const u = typeof userOrId === 'string' ? allUsers.find(x => x.id === userOrId) : userOrId;
+  if (!u) return '';
+  return shortNamesFor(allUsers)[u.id] || _firstNameOf(u);
+}
+
 const MONTHS = ['Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie',
                 'Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie'];
 
@@ -3447,7 +3488,11 @@ function renderAdminEntries(container, mode) {
           style="position:absolute;top:7px;right:8px;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;line-height:1;padding:2px 5px;border-radius:4px;transition:color 0.15s,background 0.15s"
           onmouseover="this.style.color='#e05c5c';this.style.background='rgba(224,92,92,0.12)'"
           onmouseout="this.style.color='var(--muted)';this.style.background='none'">✕</button>
-        <div class="lsc-name" style="padding-right:20px">${esc(u.name)}</div>
+        <button onclick="event.stopPropagation();editLawyerName('${u.id}')" title="Redenumește contul" aria-label="Redenumește ${esc(u.name)}"
+          style="position:absolute;top:7px;right:30px;background:none;border:none;color:var(--muted);cursor:pointer;line-height:1;padding:2px 4px;border-radius:4px;transition:color .15s,background .15s"
+          onmouseover="this.style.color='var(--gold)';this.style.background='rgba(200,169,110,0.12)'"
+          onmouseout="this.style.color='var(--muted)';this.style.background='none'"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <div class="lsc-name" style="padding-right:46px" data-lawyer-name-cell="${u.id}">${esc(u.name)}</div>
         <div class="lsc-row"><span>${metricLabel}</span><span>${metricFor(stat)}</span></div>
         <div class="lsc-row"><span>Total</span><span>${fmtEarnings(uM)}</span></div>
         ${isExpenses ? '' : `<div class="lsc-row"><span>Tarif</span><span><input class="rate-input" type="number" value="${u.rate}" min="0" step="50" onclick="event.stopPropagation()" onchange="event.stopPropagation();updateRate('${u.id}',this.value)"> EUR/h</span></div>`}
@@ -3459,7 +3504,7 @@ function renderAdminEntries(container, mode) {
     </div>
     <div class="lsc dashed ${state.filterUser==='group'?'active':''}" onclick="setFilterUser('group')" style="min-height:100px">
       <div class="lsc-name" style="color:var(--muted);margin-bottom:10px">Grup personalizat</div>
-      <div class="group-chips">${lawyers.map(u => `<span class="group-chip ${state.customGroup.includes(u.id)?'on':''}" onclick="event.stopPropagation();toggleGroupMember('${u.id}')">${u.name.split(' ')[0]}</span>`).join('')}</div>
+      <div class="group-chips">${lawyers.map(u => `<span class="group-chip ${state.customGroup.includes(u.id)?'on':''}" onclick="event.stopPropagation();toggleGroupMember('${u.id}')" title="${esc(u.name)}">${esc(shortName(u))}</span>`).join('')}</div>
       ${state.customGroup.length > 0 ? `<div class="lsc-row"><span>Total ${metricLabel.toLowerCase()}</span><span>${groupMetric}</span></div><div class="lsc-row"><span>Total</span><span>${fmtEarnings(groupMoney)}</span></div>` : `<div style="font-size:12px;color:var(--muted);margin-top:4px">Selectează avocați din grup</div>`}
     </div>
   </div>`;
@@ -3477,7 +3522,7 @@ function renderAdminEntries(container, mode) {
       ${lawyerStats.map((stat) => { const { user:u, entries:uEntries, hours:uH, money:uM } = stat; return `
         <div class="lawyer-compact-row${state.filterUser===u.id?' active':''}${(isExpenses ? uEntries.length===0 : uH===0)?' zero':''}" data-lawyer-name="${esc(u.name.toLowerCase())}" onclick="setFilterUser('${u.id}')">
           <input class="lawyer-group-check" type="checkbox" ${state.customGroup.includes(u.id)?'checked':''} onclick="event.stopPropagation()" onchange="toggleGroupMember('${u.id}')" title="Include în grupul personalizat" aria-label="Include ${esc(u.name)} în grup">
-          <span class="lawyer-compact-name">${esc(u.name)}</span>
+          <span class="lawyer-compact-name" data-lawyer-name-cell="${u.id}">${esc(u.name)} <button onclick="event.stopPropagation();editLawyerName('${u.id}')" title="Redenumește contul" aria-label="Redenumește ${esc(u.name)}" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:0 2px;vertical-align:middle;line-height:1" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--muted)'"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></span>
           <span class="lawyer-compact-hours">${metricFor(stat)}</span>
           <span class="lawyer-compact-total">${fmtEarnings(uM)}</span>
           <span class="lawyer-compact-rate">${isExpenses ? '' : `<input class="rate-input" type="number" value="${u.rate}" min="0" step="50" onclick="event.stopPropagation()" onchange="event.stopPropagation();updateRate('${u.id}',this.value)"> EUR/h`}</span>
@@ -3507,7 +3552,7 @@ function renderAdminEntries(container, mode) {
     <div class="table-wrap">
       <div class="table-header">
         <span class="table-title">
-          ${state.filterUser==='all' ? (isExpenses ? 'Toate cheltuielile' : 'Toate intrările') : state.filterUser==='group' ? `Grup: ${state.customGroup.map(id=>userMap[id]?.name?.split(' ')[0]).filter(Boolean).join(', ') || '—'}` : `${isExpenses ? 'Cheltuielile lui' : 'Intrările lui'} ${userMap[state.filterUser]?.name || ''}`}
+          ${state.filterUser==='all' ? (isExpenses ? 'Toate cheltuielile' : 'Toate intrările') : state.filterUser==='group' ? `Grup: ${state.customGroup.map(id=>shortName(id)).filter(Boolean).join(', ') || '—'}` : `${isExpenses ? 'Cheltuielile lui' : 'Intrările lui'} ${userMap[state.filterUser]?.name || ''}`}
           — ${fmtDate(state.dateStart)} — ${fmtDate(state.dateEnd)}
         </span>
         <div style="display:flex;align-items:center;gap:16px">
@@ -4930,7 +4975,7 @@ function _filterInvEntries() {
             <input type="checkbox" class="inv-ecb" value="${e.id}" ${isChecked(e) ? 'checked' : ''} style="accent-color:var(--gold);flex-shrink:0">
             <span style="color:var(--muted);min-width:68px;flex-shrink:0">${fmtDate(e.date)}</span>
             <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.description)}${e.client?` <em style="color:var(--muted)">(${esc(e.client)})</em>`:''}</span>
-            <span style="color:var(--muted);font-size:12px;flex-shrink:0">${u?.name?.split(' ')[0]||''}</span>
+            <span style="color:var(--muted);font-size:12px;flex-shrink:0" title="${esc(u?.name||'')}">${esc(shortName(u))}</span>
             <span style="color:var(--gold);font-variant-numeric:tabular-nums;min-width:52px;text-align:right;flex-shrink:0">${val}</span>
           </label>
         `;
@@ -6029,6 +6074,49 @@ async function advanceInvoice(id, newStatus) {
   if (inv) inv.status = newStatus;
   closeModal();
   viewInvoice(id);
+}
+
+// Admins can rename accounts — everyone picked their own name format when
+// signing up, so these need cleaning up centrally rather than one login at a
+// time. Only the display name changes; the account and its entries are untouched.
+function editLawyerName(id) {
+  if (!isAdmin(getCurrentUser())) return;
+  const cell = document.querySelector(`[data-lawyer-name-cell="${id}"]`);
+  const u = allUsers.find(x => x.id === id);
+  if (!cell || !u || cell.dataset.editing === '1') return;
+  cell.dataset.editing = '1';
+  cell.innerHTML = `
+    <input class="tei" type="text" value="${esc(u.name)}" data-f="lawyer-name" style="width:100%;min-width:0"
+      onclick="event.stopPropagation()"
+      onkeydown="event.stopPropagation();if(event.key==='Enter'){saveLawyerName('${id}')}else if(event.key==='Escape'){renderAdminTabContent()}">
+    <span style="display:inline-flex;gap:4px;margin-top:5px">
+      <button class="btn-edit-save" onclick="event.stopPropagation();saveLawyerName('${id}')" title="Salvează">✓</button>
+      <button class="btn-edit-cancel" onclick="event.stopPropagation();renderAdminTabContent()" title="Anulează">✕</button>
+    </span>`;
+  const input = cell.querySelector('input');
+  if (input) { input.focus(); input.select(); }
+}
+
+async function saveLawyerName(id) {
+  if (!isAdmin(getCurrentUser())) return;
+  const cell = document.querySelector(`[data-lawyer-name-cell="${id}"]`);
+  const name = (cell?.querySelector('[data-f="lawyer-name"]')?.value || '').trim();
+  const u = allUsers.find(x => x.id === id);
+  if (!u) return;
+  if (!name) { alert('Numele nu poate fi gol.'); return; }
+  if (name === u.name) { renderAdminTabContent(); return; }
+  const { error } = await db.from('profiles').update({ name }).eq('id', id);
+  if (error) { alert(error.message); return; }
+  u.name = name;
+  localStorage.setItem('pontaj_users_cache', JSON.stringify(allUsers));
+  // Renaming yourself has to refresh the header too, which reads the cached profile.
+  if (currentUser?.id === id) {
+    currentUser.name = name;
+    localStorage.setItem('pontaj_profile', JSON.stringify(currentUser));
+    const hdr = document.getElementById('headerUser');
+    if (hdr) hdr.textContent = name;
+  }
+  render();
 }
 
 async function updateRate(userId, rawRate) {
