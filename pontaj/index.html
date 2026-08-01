@@ -4076,6 +4076,7 @@ async function saveAtentieEdit(id) {
 }
 
 async function resolveAtentie(id) {
+  if (!confirm('Sigur doriți să marcați această atenție ca rezolvată?')) return;
   const user = getCurrentUser();
   const { data, error } = await db.from('atentii').update({
     status: 'resolved', resolved_at: new Date().toISOString(), resolved_by_name: user.name,
@@ -4266,6 +4267,7 @@ async function addPersonalAtentie() {
 }
 
 async function resolvePersonalAtentie(id) {
+  if (!confirm('Sigur doriți să marcați această atenție personală ca rezolvată?')) return;
   const { data, error } = await db.from('personal_atentii').update({
     status: 'resolved', resolved_at: new Date().toISOString(),
   }).eq('id', id).select().single();
