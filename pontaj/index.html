@@ -1949,7 +1949,12 @@ function splitEarnings(entries, getRateForEntry) {
   let eur = 0, mdl = 0;
   entries.forEach(e => {
     if (e.pro_bono) return; // unpaid work — hours still count, money never does
-    if (e.fixed_price != null) mdl += e.fixed_price;
+    if (e.fixed_price != null) {
+      // EUR expenses must land in the EUR bucket — bucketing them as MDL
+      // silently understates them by the whole exchange rate.
+      if (getCheltuialaCurrency(e) === 'EUR') eur += Number(e.fixed_price) || 0;
+      else mdl += Number(e.fixed_price) || 0;
+    }
     else eur += Number(e.hours) * (getRateForEntry(e) || 0);
   });
   return { eur, mdl };
