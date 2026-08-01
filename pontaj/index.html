@@ -1344,7 +1344,7 @@ function initDateRange() {
   };
 }
 const _dr = initDateRange();
-const state = { dateStart: _dr.start, dateEnd: _dr.end, filterUser: 'all', viewMode: 'admin', customGroup: [], adminTab: 'pontaj', clientiSearch: '', clientiStatus: 'all', registruSearch: '', registruDateStart: null, registruDateEnd: null, registruPreset: 'all', bonuriSearch: '', bonuriFilter: 'all', pontajPage: 1, registruPage: 1, bonuriPage: 1, avocatTab: 'pontaj', activePreset: '30d', siteStatsDays: 30, impozitePeriod: String(new Date().getFullYear()), cheltuieliCurrency: 'MDL' };
+const state = { dateStart: _dr.start, dateEnd: _dr.end, filterUser: 'all', viewMode: 'admin', customGroup: [], adminTab: 'pontaj', clientiSearch: '', clientiStatus: 'all', registruSearch: '', registruDateStart: null, registruDateEnd: null, registruPreset: 'all', bonuriSearch: '', bonuriFilter: 'all', pontajPage: 1, cheltuieliPage: 1, registruPage: 1, bonuriPage: 1, avocatTab: 'pontaj', activePreset: '30d', siteStatsDays: 30, impozitePeriod: String(new Date().getFullYear()), cheltuieliCurrency: 'MDL' };
 const PAGE_SIZE = 30;
 function isAdmin(u) { return u?.role === 'admin' || u?.role === 'owner'; }
 
@@ -1372,6 +1372,7 @@ function pagerBar(page, totalPages, gotoFn, variant) {
   `;
 }
 function setPontajPage(p) { state.pontajPage = p; renderAdminTabContent(); }
+function setCheltuieliPage(p) { state.cheltuieliPage = p; renderAdminTabContent(); }
 function setRegistruPage(p) { state.registruPage = p; renderAdminTabContent(); }
 
 const PRESETS = [
@@ -3166,7 +3167,8 @@ function _restoreEntryRow(row, e) {
 
 // ── Admin tab shell ──────────────────────────────────────
 const ADMIN_TABS = [
-  { key: 'pontaj',    label: 'Pontaj' },
+  { key: 'pontaj',     label: 'Pontaj' },
+  { key: 'cheltuieli', label: 'Cheltuieli' },
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'clienti',   label: 'Clienți' },
   { key: 'facturi',   label: 'Facturi' },
@@ -3192,6 +3194,7 @@ function getOrderedAdminTabs(includeHidden = false) {
 function renderAdmin() {
   const TAB_ICON = {
     pontaj:    '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+    cheltuieli:'<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>',
     dashboard: '<path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-7"/>',
     clienti:   '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
     facturi:   '<path d="M6 2h9l4 4v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M14 2v5h5"/><line x1="8" y1="12" x2="15" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/>',
@@ -3363,6 +3366,7 @@ function renderAdminTabContent() {
   const el = document.getElementById('admin-tab-content');
   if (!el) return;
   if      (state.adminTab === 'pontaj')    renderAdminPontaj(el);
+  else if (state.adminTab === 'cheltuieli') renderAdminCheltuieli(el);
   else if (state.adminTab === 'dashboard') renderDashboard(el);
   else if (state.adminTab === 'clienti')   renderClienti(el);
   else if (state.adminTab === 'facturi')   renderFacturi(el);
@@ -3395,12 +3399,24 @@ function searchRegistru(inputEl) {
 function clearRegistruSearch() { state.registruSearch = ''; state.registruPage = 1; renderAdminTabContent(); }
 
 // ── Tab: Pontaj (existing entries view) ──────────────────
-function renderAdminPontaj(container) {
+function renderAdminPontaj(container)     { renderAdminEntries(container, 'pontaj'); }
+function renderAdminCheltuieli(container) { renderAdminEntries(container, 'cheltuieli'); }
+
+// Shared by the admin Pontaj and Cheltuieli tabs — identical framework, the
+// only differences are which entries feed it (billable work vs. expenses),
+// the "Generează raport" button, and hours-vs-count wording. Expenses used to
+// be mixed into the Pontaj tab, which made both hard to read.
+function renderAdminEntries(container, mode) {
+  const isExpenses = mode === 'cheltuieli';
+  const belongsHere = e => isExpenses ? isCheltuialaEntry(e) : !isCheltuialaEntry(e);
+  const pageKey  = isExpenses ? 'cheltuieliPage' : 'pontajPage';
+  const setPage  = isExpenses ? 'setCheltuieliPage' : 'setPontajPage';
+
   const lawyers  = allUsers.filter(u => u.role !== 'owner' && (u.status === 'approved' || !u.status));
   const userMap  = Object.fromEntries(allUsers.map(u => [u.id, u]));
   const billedIds = new Set(allInvoiceEntries.map(ie => ie.entry_id));
 
-  const periodEntries = filterEntries(allEntries, state.dateStart, state.dateEnd, null);
+  const periodEntries = filterEntries(allEntries, state.dateStart, state.dateEnd, null).filter(belongsHere);
   const filtered = (
     state.filterUser === 'all'   ? periodEntries :
     state.filterUser === 'group' ? periodEntries.filter(e => state.customGroup.includes(e.user_id)) :
@@ -3408,16 +3424,23 @@ function renderAdminPontaj(container) {
   ).sort((a,b) => b.date.localeCompare(a.date));
 
   const totalAllHours = sumH(periodEntries);
+  const allMoney      = splitEarnings(periodEntries, e => allUsers.find(u => u.id === e.user_id)?.rate);
   const groupEntries  = periodEntries.filter(e => state.customGroup.includes(e.user_id));
   const groupHours    = sumH(groupEntries);
   const groupMoney    = splitEarnings(groupEntries, e => allUsers.find(u => u.id === e.user_id)?.rate);
   const lawyerStats   = lawyers.map(u => {
-    const entries = filterEntries(allEntries, state.dateStart, state.dateEnd, u.id);
+    const entries = filterEntries(allEntries, state.dateStart, state.dateEnd, u.id).filter(belongsHere);
     return { user: u, entries, hours: sumH(entries), money: splitEarnings(entries, () => u.rate) };
   });
+  // Expenses always carry hours = 0, so a "0.0 h" row would be dead weight —
+  // show how many expenses the lawyer filed instead.
+  const metricLabel = isExpenses ? 'Cheltuieli' : 'Ore';
+  const metricFor   = s => isExpenses ? String(s.entries.length) : `${s.hours.toFixed(1)} h`;
+  const totalMetric = isExpenses ? `${periodEntries.length}` : `${totalAllHours.toFixed(1)} h`;
+  const groupMetric = isExpenses ? `${groupEntries.length}` : `${groupHours.toFixed(1)} h`;
 
   const lawyerCardsHtml = `<div class="lawyer-grid">
-    ${lawyerStats.map(({ user:u, entries:uEntries, hours:uH, money:uM }) => `
+    ${lawyerStats.map((stat) => { const { user:u, entries:uEntries, money:uM } = stat; return `
       <div class="lsc ${state.filterUser===u.id?'active':''}" onclick="setFilterUser('${u.id}')" style="position:relative">
         <button onclick="event.stopPropagation();confirmDeleteUser('${u.id}','${u.name.replace(/'/g,"\\'")}',${uEntries.length})"
           title="Șterge cont"
@@ -3425,51 +3448,52 @@ function renderAdminPontaj(container) {
           onmouseover="this.style.color='#e05c5c';this.style.background='rgba(224,92,92,0.12)'"
           onmouseout="this.style.color='var(--muted)';this.style.background='none'">✕</button>
         <div class="lsc-name" style="padding-right:20px">${esc(u.name)}</div>
-        <div class="lsc-row"><span>Ore</span><span>${uH.toFixed(1)} h</span></div>
+        <div class="lsc-row"><span>${metricLabel}</span><span>${metricFor(stat)}</span></div>
         <div class="lsc-row"><span>Total</span><span>${fmtEarnings(uM)}</span></div>
-        <div class="lsc-row"><span>Tarif</span><span><input class="rate-input" type="number" value="${u.rate}" min="0" step="50" onclick="event.stopPropagation()" onchange="event.stopPropagation();updateRate('${u.id}',this.value)"> EUR/h</span></div>
-      </div>`).join('')}
+        ${isExpenses ? '' : `<div class="lsc-row"><span>Tarif</span><span><input class="rate-input" type="number" value="${u.rate}" min="0" step="50" onclick="event.stopPropagation()" onchange="event.stopPropagation();updateRate('${u.id}',this.value)"> EUR/h</span></div>`}
+      </div>`; }).join('')}
     <div class="lsc dashed ${state.filterUser==='all'?'active':''}" onclick="setFilterUser('all')">
       <div class="lsc-name" style="color:var(--muted)">Toți avocații</div>
-      <div class="lsc-row"><span>Total ore</span><span>${totalAllHours.toFixed(1)} h</span></div>
+      <div class="lsc-row"><span>Total ${metricLabel.toLowerCase()}</span><span>${totalMetric}</span></div>
+      ${isExpenses ? `<div class="lsc-row"><span>Total</span><span>${fmtEarnings(allMoney)}</span></div>` : ''}
     </div>
     <div class="lsc dashed ${state.filterUser==='group'?'active':''}" onclick="setFilterUser('group')" style="min-height:100px">
       <div class="lsc-name" style="color:var(--muted);margin-bottom:10px">Grup personalizat</div>
       <div class="group-chips">${lawyers.map(u => `<span class="group-chip ${state.customGroup.includes(u.id)?'on':''}" onclick="event.stopPropagation();toggleGroupMember('${u.id}')">${u.name.split(' ')[0]}</span>`).join('')}</div>
-      ${state.customGroup.length > 0 ? `<div class="lsc-row"><span>Total ore</span><span>${groupHours.toFixed(1)} h</span></div><div class="lsc-row"><span>Total</span><span>${fmtEarnings(groupMoney)}</span></div>` : `<div style="font-size:12px;color:var(--muted);margin-top:4px">Selectează avocați din grup</div>`}
+      ${state.customGroup.length > 0 ? `<div class="lsc-row"><span>Total ${metricLabel.toLowerCase()}</span><span>${groupMetric}</span></div><div class="lsc-row"><span>Total</span><span>${fmtEarnings(groupMoney)}</span></div>` : `<div style="font-size:12px;color:var(--muted);margin-top:4px">Selectează avocați din grup</div>`}
     </div>
   </div>`;
 
   const lawyerCompactHtml = `<div class="lawyer-compact-wrap">
     <div class="lawyer-compact-toolbar">
       <div class="lawyer-compact-summary">
-        <button class="preset-chip${state.filterUser==='all'?' active':''}" onclick="setFilterUser('all')">Toți · ${totalAllHours.toFixed(1)} h</button>
-        <button class="preset-chip${state.filterUser==='group'?' active':''}" onclick="setFilterUser('group')">Grup · ${groupHours.toFixed(1)} h${state.customGroup.length?' · '+fmtEarnings(groupMoney):''}</button>
+        <button class="preset-chip${state.filterUser==='all'?' active':''}" onclick="setFilterUser('all')">Toți · ${totalMetric}</button>
+        <button class="preset-chip${state.filterUser==='group'?' active':''}" onclick="setFilterUser('group')">Grup · ${groupMetric}${state.customGroup.length?' · '+fmtEarnings(groupMoney):''}</button>
       </div>
       <input class="lawyer-compact-search" type="search" placeholder="Caută avocat..." oninput="filterLawyerCompact(this.value)" aria-label="Caută avocat">
     </div>
-    <div class="lawyer-compact-row lawyer-compact-head"><span></span><span>Avocat</span><span style="text-align:right">Ore</span><span style="text-align:right">Total</span><span style="text-align:right">Tarif</span><span></span></div>
+    <div class="lawyer-compact-row lawyer-compact-head"><span></span><span>Avocat</span><span style="text-align:right">${metricLabel}</span><span style="text-align:right">Total</span><span style="text-align:right">${isExpenses ? '' : 'Tarif'}</span><span></span></div>
     <div id="lawyer-compact-list">
-      ${lawyerStats.map(({ user:u, entries:uEntries, hours:uH, money:uM }) => `
-        <div class="lawyer-compact-row${state.filterUser===u.id?' active':''}${uH===0?' zero':''}" data-lawyer-name="${esc(u.name.toLowerCase())}" onclick="setFilterUser('${u.id}')">
+      ${lawyerStats.map((stat) => { const { user:u, entries:uEntries, hours:uH, money:uM } = stat; return `
+        <div class="lawyer-compact-row${state.filterUser===u.id?' active':''}${(isExpenses ? uEntries.length===0 : uH===0)?' zero':''}" data-lawyer-name="${esc(u.name.toLowerCase())}" onclick="setFilterUser('${u.id}')">
           <input class="lawyer-group-check" type="checkbox" ${state.customGroup.includes(u.id)?'checked':''} onclick="event.stopPropagation()" onchange="toggleGroupMember('${u.id}')" title="Include în grupul personalizat" aria-label="Include ${esc(u.name)} în grup">
           <span class="lawyer-compact-name">${esc(u.name)}</span>
-          <span class="lawyer-compact-hours">${uH.toFixed(1)} h</span>
+          <span class="lawyer-compact-hours">${metricFor(stat)}</span>
           <span class="lawyer-compact-total">${fmtEarnings(uM)}</span>
-          <span class="lawyer-compact-rate"><input class="rate-input" type="number" value="${u.rate}" min="0" step="50" onclick="event.stopPropagation()" onchange="event.stopPropagation();updateRate('${u.id}',this.value)"> EUR/h</span>
+          <span class="lawyer-compact-rate">${isExpenses ? '' : `<input class="rate-input" type="number" value="${u.rate}" min="0" step="50" onclick="event.stopPropagation()" onchange="event.stopPropagation();updateRate('${u.id}',this.value)"> EUR/h`}</span>
           <button class="btn-delete" onclick="event.stopPropagation();confirmDeleteUser('${u.id}','${u.name.replace(/'/g,"\\'")}',${uEntries.length})" title="Șterge cont" aria-label="Șterge ${esc(u.name)}">✕</button>
-        </div>`).join('')}
+        </div>`; }).join('')}
     </div>
   </div>`;
   const lawyerOverviewHtml = adminTabPreferences.lawyerView === 'compact' ? lawyerCompactHtml : lawyerCardsHtml;
 
-  const { items: pageEntries, page: pontajPage, totalPages: pontajTotalPages } = paginate(filtered, state.pontajPage, PAGE_SIZE);
+  const { items: pageEntries, page: pontajPage, totalPages: pontajTotalPages } = paginate(filtered, state[pageKey], PAGE_SIZE);
 
   container.innerHTML = `
     <div class="controls" style="flex-direction:column;align-items:flex-start;gap:10px;">
       <div style="display:flex;align-items:center;justify-content:space-between;width:100%;flex-wrap:wrap;gap:10px;">
         ${rangePicker()}
-        <button class="btn-primary" onclick="showReportForm()">Generează raport</button>
+        ${isExpenses ? '' : `<button class="btn-primary" onclick="showReportForm()">Generează raport</button>`}
       </div>
     </div>
 
@@ -3483,23 +3507,23 @@ function renderAdminPontaj(container) {
     <div class="table-wrap">
       <div class="table-header">
         <span class="table-title">
-          ${state.filterUser==='all' ? 'Toate intrările' : state.filterUser==='group' ? `Grup: ${state.customGroup.map(id=>userMap[id]?.name?.split(' ')[0]).filter(Boolean).join(', ') || '—'}` : `Intrările lui ${userMap[state.filterUser]?.name || ''}`}
+          ${state.filterUser==='all' ? (isExpenses ? 'Toate cheltuielile' : 'Toate intrările') : state.filterUser==='group' ? `Grup: ${state.customGroup.map(id=>userMap[id]?.name?.split(' ')[0]).filter(Boolean).join(', ') || '—'}` : `${isExpenses ? 'Cheltuielile lui' : 'Intrările lui'} ${userMap[state.filterUser]?.name || ''}`}
           — ${fmtDate(state.dateStart)} — ${fmtDate(state.dateEnd)}
         </span>
         <div style="display:flex;align-items:center;gap:16px">
-          ${filtered.length ? `<span style="font-size:13px;color:var(--muted)">${filtered.length} intrări · ${sumH(filtered).toFixed(1)}h</span>` : ''}
-          ${pagerBar(pontajPage, pontajTotalPages, 'setPontajPage', 'top')}
+          ${filtered.length ? `<span style="font-size:13px;color:var(--muted)">${filtered.length} ${isExpenses ? 'cheltuieli' : 'intrări'} · ${isExpenses ? fmtEarnings(splitEarnings(filtered, e => allUsers.find(u => u.id === e.user_id)?.rate)) : sumH(filtered).toFixed(1)+'h'}</span>` : ''}
+          ${pagerBar(pontajPage, pontajTotalPages, setPage, 'top')}
         </div>
       </div>
       ${filtered.length === 0
-        ? `<div class="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.3;margin-bottom:12px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><p>Nicio intrare pentru această perioadă.</p></div>`
+        ? `<div class="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.3;margin-bottom:12px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><p>${isExpenses ? 'Nicio cheltuială pentru această perioadă.' : 'Nicio intrare pentru această perioadă.'}</p></div>`
         : `<table class="entries-table">
             <thead><tr>
               <th style="width:100px">Data</th>
               <th style="width:130px;min-width:130px">Avocat</th>
               <th>Client / Dosar</th>
               <th>Descriere</th>
-              <th style="width:110px">Ore / Valoare</th>
+              <th style="width:110px">${isExpenses ? 'Sumă' : 'Ore / Valoare'}</th>
               <th style="width:72px"></th>
             </tr></thead>
             <tbody>
@@ -3514,10 +3538,10 @@ function renderAdminPontaj(container) {
                     <td class="td-avocat" data-label="Avocat" style="font-weight:500;font-size:13px;min-width:130px">${u?.name || '—'}</td>
                     <td class="td-client" data-label="Client / Dosar" style="color:var(--muted);font-size:13px">${esc(e.client) || '—'}</td>
                     <td class="td-desc" data-label="Descriere" style="font-size:14px">${esc(e.description)}</td>
-                    <td class="td-hours" data-label="Ore / Valoare">${val}${billedBadge}</td>
+                    <td class="td-hours" data-label="${isExpenses ? 'Sumă' : 'Ore / Valoare'}">${val}${billedBadge}</td>
                     <td class="td-del">
                       ${atentieButtonHtml(e.id)}
-                      ${proBonoButtonHtml(e.id)}
+                      ${isExpenses ? '' : proBonoButtonHtml(e.id)}
                       <button class="btn-edit" onclick="editEntry('${e.id}')" aria-label="Editează" title="Editează"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
                       <button class="btn-delete" onclick="deleteEntry('${e.id}')" aria-label="Șterge intrarea" title="Șterge">✕</button>
                     </td>
@@ -3526,7 +3550,7 @@ function renderAdminPontaj(container) {
               }).join('')}
             </tbody>
           </table>
-          ${pagerBar(pontajPage, pontajTotalPages, 'setPontajPage')}`
+          ${pagerBar(pontajPage, pontajTotalPages, setPage)}`
       }
     </div>
   `;
