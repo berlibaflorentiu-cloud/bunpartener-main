@@ -1344,7 +1344,7 @@ function initDateRange() {
   };
 }
 const _dr = initDateRange();
-const state = { dateStart: _dr.start, dateEnd: _dr.end, filterUser: 'all', viewMode: 'admin', customGroup: [], adminTab: 'pontaj', clientiSearch: '', clientiStatus: 'all', registruSearch: '', registruDateStart: null, registruDateEnd: null, registruPreset: 'all', bonuriSearch: '', bonuriFilter: 'all', pontajPage: 1, registruPage: 1, bonuriPage: 1, avocatTab: 'pontaj', activePreset: '30d', siteStatsDays: 30, impozitePeriod: String(new Date().getFullYear()) };
+const state = { dateStart: _dr.start, dateEnd: _dr.end, filterUser: 'all', viewMode: 'admin', customGroup: [], adminTab: 'pontaj', clientiSearch: '', clientiStatus: 'all', registruSearch: '', registruDateStart: null, registruDateEnd: null, registruPreset: 'all', bonuriSearch: '', bonuriFilter: 'all', pontajPage: 1, registruPage: 1, bonuriPage: 1, avocatTab: 'pontaj', activePreset: '30d', siteStatsDays: 30, impozitePeriod: String(new Date().getFullYear()), cheltuieliCurrency: 'MDL' };
 const PAGE_SIZE = 30;
 function isAdmin(u) { return u?.role === 'admin' || u?.role === 'owner'; }
 
@@ -1829,6 +1829,36 @@ function fmtMoney(n) {
   return n.toLocaleString('ro-RO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' MDL';
 }
 
+function isCheltuialaEntry(entry) {
+  return entry?.fixed_type === 'cheltuiala' || entry?.fixed_type === 'cheltuiala_eur';
+}
+
+function getCheltuialaCurrency(entry) {
+  return entry?.fixed_type === 'cheltuiala_eur' ? 'EUR' : 'MDL';
+}
+
+function cheltuialaTypeForCurrency(currency) {
+  return currency === 'EUR' ? 'cheltuiala_eur' : 'cheltuiala';
+}
+
+function fmtCurrencyAmount(amount, currency = 'MDL') {
+  const value = Number(amount) || 0;
+  return currency === 'EUR'
+    ? value.toLocaleString('ro-RO', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' EUR'
+    : fmtMoney(value);
+}
+
+function fmtEntryFixedAmount(entry) {
+  return fmtCurrencyAmount(entry.fixed_price, isCheltuialaEntry(entry) ? getCheltuialaCurrency(entry) : 'MDL');
+}
+
+function fmtSplitAmounts(mdl, eur) {
+  const parts = [];
+  if (eur > 0) parts.push(fmtCurrencyAmount(eur, 'EUR'));
+  if (mdl > 0) parts.push(fmtCurrencyAmount(mdl, 'MDL'));
+  return parts.join(' + ') || '—';
+}
+
 // Same as fmtMoney but keeps cents — used for Registru (receipts), where
 // sums are entered to the ban and shouldn't round away on display.
 // cur is a display label only — no conversion is ever applied to n.
@@ -2293,7 +2323,7 @@ function renderAvocatPontaj(container, user) {
   const timerRunning = !!timerStart;
 
   const entries = filterEntries(allEntries, state.dateStart, state.dateEnd, user.id)
-                    .filter(e => e.fixed_type !== 'cheltuiala')
+                    .filter(e => !isCheltuialaEntry(e))
                     .sort((a,b) => b.date.localeCompare(a.date));
 
   const hours = sumH(entries);
@@ -2396,7 +2426,7 @@ function renderAvocatPontaj(container, user) {
                   <td class="td-date" data-label="Data">${hasAtentie(e.id) ? '<span class="atentie-dot" title="Are atenție activă" aria-hidden="true"></span>' : ''}${fmtDate(e.date)}</td>
                   <td class="td-client" data-label="Client / Dosar" style="color:var(--muted);font-size:13px">${esc(e.client) || '—'}</td>
                   <td class="td-desc" data-label="Descriere">${esc(e.description)}</td>
-                  <td class="td-hours" data-label="Ore / Valoare">${e.fixed_price != null ? fmtMoney(e.fixed_price) : Number(e.hours).toFixed(1) + 'h'}${e.pro_bono ? '<span class="badge-probono">pro bono</span>' : ''}</td>
+                  <td class="td-hours" data-label="Ore / Valoare">${e.fixed_price != null ? fmtEntryFixedAmount(e) : Number(e.hours).toFixed(1) + 'h'}${e.pro_bono ? '<span class="badge-probono">pro bono</span>' : ''}</td>
                   <td class="td-del">
                     ${atentieButtonHtml(e.id)}
                     ${proBonoButtonHtml(e.id)}
@@ -2414,10 +2444,11 @@ function renderAvocatPontaj(container, user) {
 
 function renderAvocatCheltuieli(container, user) {
   const entries = filterEntries(allEntries, state.dateStart, state.dateEnd, user.id)
-                    .filter(e => e.fixed_type === 'cheltuiala')
+                    .filter(e => isCheltuialaEntry(e))
                     .sort((a,b) => b.date.localeCompare(a.date));
 
-  const total = entries.reduce((s, e) => s + (Number(e.fixed_price) || 0), 0);
+  const totalMdl = entries.filter(e => getCheltuialaCurrency(e) === 'MDL').reduce((s, e) => s + (Number(e.fixed_price) || 0), 0);
+  const totalEur = entries.filter(e => getCheltuialaCurrency(e) === 'EUR').reduce((s, e) => s + (Number(e.fixed_price) || 0), 0);
 
   container.innerHTML = `
     <div class="controls" style="flex-direction:column;align-items:flex-start;gap:10px;">
@@ -2425,7 +2456,7 @@ function renderAvocatCheltuieli(container, user) {
     </div>
 
     <div class="add-form">
-      <div class="form-title">Adaugă cheltuială (MDL)</div>
+      <div class="form-title">Adaugă cheltuială</div>
       <div class="form-grid cheltuiala-add-grid">
         <div class="field">
           <label>Data</label>
@@ -2436,8 +2467,12 @@ function renderAvocatCheltuieli(container, user) {
           <input type="text" id="c-client" name="client-no-autofill" placeholder="ex. SC Alpha SRL — dosar 142/2024" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" oninput="clientAcInput(this)" onkeydown="clientAcKeydown(event)" onblur="setTimeout(closeClientAc,200)">
         </div>
         <div class="field">
-          <label>Sumă (MDL)</label>
-          <input type="number" id="c-suma" min="0" step="10" placeholder="ex. 100">
+          <label id="c-suma-label">Sumă (${state.cheltuieliCurrency})</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="number" id="c-suma" min="0" step="0.01" placeholder="ex. 100" style="min-width:0">
+            <div id="c-currency-toggle" style="flex-shrink:0">${currencyToggleHtml(state.cheltuieliCurrency, "setCheltuialaCurrency('MDL')", "setCheltuialaCurrency('EUR')")}</div>
+            <input type="hidden" id="c-currency" value="${state.cheltuieliCurrency}">
+          </div>
         </div>
         <button class="btn-primary" style="padding:9px 22px;font-size:14px" onclick="addCheltuiala()">Adaugă</button>
         <div class="field" style="grid-column:1/-1">
@@ -2451,7 +2486,7 @@ function renderAvocatCheltuieli(container, user) {
     <div class="table-wrap">
       <div class="table-header">
         <span class="table-title">Cheltuieli — ${fmtDate(state.dateStart)} — ${fmtDate(state.dateEnd)}</span>
-        ${entries.length ? `<span class="reg-total-badge">Total: ${fmtMoney(total)}</span>` : ''}
+        ${entries.length ? `<span class="reg-total-badge">Total: ${fmtSplitAmounts(totalMdl, totalEur)}</span>` : ''}
       </div>
       ${entries.length === 0
         ? `<div class="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.3;margin-bottom:12px"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg><p>Nicio cheltuială pentru această perioadă.<br>Adaugă prima cheltuială din formularul de mai sus.</p></div>`
@@ -2469,7 +2504,7 @@ function renderAvocatCheltuieli(container, user) {
                   <td class="td-date" data-label="Data">${hasAtentie(e.id) ? '<span class="atentie-dot" title="Are atenție activă" aria-hidden="true"></span>' : ''}${fmtDate(e.date)}</td>
                   <td class="td-client" data-label="Client / Dosar" style="color:var(--muted);font-size:13px">${esc(e.client) || '—'}</td>
                   <td class="td-desc" data-label="Descriere">${esc(e.description)}</td>
-                  <td class="td-hours" data-label="Sumă">${fmtMoney(Number(e.fixed_price) || 0)}</td>
+                  <td class="td-hours" data-label="Sumă">${fmtEntryFixedAmount(e)}</td>
                   <td class="td-del">
                     ${atentieButtonHtml(e.id)}
                     <button class="btn-edit" onclick="editEntry('${e.id}')" aria-label="Editează" title="Editează"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
@@ -2490,9 +2525,10 @@ async function addCheltuiala() {
   const client      = document.getElementById('c-client').value.trim();
   const description = document.getElementById('c-desc').value.trim();
   const suma        = parseFloat(document.getElementById('c-suma').value);
+  const currency    = document.getElementById('c-currency')?.value === 'EUR' ? 'EUR' : 'MDL';
 
   if (!date || !description) { alert('Completează data și descrierea cheltuielii.'); return; }
-  if (!suma || suma <= 0)    { alert('Completează suma cheltuielii (MDL).'); return; }
+  if (!suma || suma <= 0)    { alert(`Completează suma cheltuielii (${currency}).`); return; }
 
   const btn = document.querySelector('#avocat-tab-content .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = '...'; }
@@ -2501,13 +2537,25 @@ async function addCheltuiala() {
     user_id: user.id,
     date, hours: 0, client, description,
     fixed_price: suma,
-    fixed_type: 'cheltuiala',
+    fixed_type: cheltuialaTypeForCurrency(currency),
   }).select().single();
 
   if (error) { alert(error.message); if (btn) { btn.disabled = false; btn.textContent = 'Adaugă'; } return; }
   allEntries.unshift(data);
   await maybeCreateAtentieFromForm('c', data.id, client, description, user);
   render();
+}
+
+function setCheltuialaCurrency(currency) {
+  const normalized = currency === 'EUR' ? 'EUR' : 'MDL';
+  state.cheltuieliCurrency = normalized;
+  const hidden = document.getElementById('c-currency');
+  if (hidden) hidden.value = normalized;
+  const label = document.getElementById('c-suma-label');
+  if (label) label.textContent = `Sumă (${normalized})`;
+  document.querySelectorAll('#c-currency-toggle .toggle-btn').forEach(button => {
+    button.classList.toggle('active', button.textContent.trim() === normalized);
+  });
 }
 
 // ── Avansuri — admin CRUD, recipient read-only ──────────
@@ -2988,11 +3036,18 @@ function editEntry(id) {
   row.dataset.editing = '1';
 
   const isFixed = e.fixed_price != null;
+  const isExpense = isCheltuialaEntry(e);
+  if (isExpense) row.dataset.cheltuialaCurrency = getCheltuialaCurrency(e);
   row.querySelector('.td-date').innerHTML   = `<input class="tei" type="date" value="${e.date}" data-f="date">`;
   row.querySelector('.td-client').innerHTML = `<input class="tei" type="text" value="${(e.client||'').replace(/"/g,'&quot;')}" data-f="client" placeholder="Client / Dosar">`;
   row.querySelector('.td-desc').innerHTML   = `<input class="tei" type="text" value="${e.description.replace(/"/g,'&quot;')}" data-f="desc" placeholder="Descriere">`;
   row.querySelector('.td-hours').innerHTML  = isFixed
-    ? `<input class="tei" type="number" value="${e.fixed_price}" data-f="fixed_price" placeholder="MDL" min="0">`
+    ? (isExpense
+      ? `<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">
+          <input class="tei" type="number" value="${e.fixed_price}" data-f="fixed_price" placeholder="${getCheltuialaCurrency(e)}" min="0" step="0.01" style="min-width:72px">
+          <div id="edit-cheltuiala-currency-${id}">${currencyToggleHtml(getCheltuialaCurrency(e), `setEntryCheltuialaCurrency('${id}','MDL')`, `setEntryCheltuialaCurrency('${id}','EUR')`, 'regcell')}</div>
+        </div>`
+      : `<input class="tei" type="number" value="${e.fixed_price}" data-f="fixed_price" placeholder="MDL" min="0">`)
     : `<input class="tei" type="number" value="${Number(e.hours).toFixed(1)}" data-f="hours" placeholder="ore" min="0" step="0.5">`;
   row.querySelector('.td-del').innerHTML = `
     <button class="btn-edit-save" onclick="saveEntryEdit('${id}')" title="Salvează">✓</button>
@@ -3021,8 +3076,10 @@ async function saveEntryEdit(id) {
   const client      = (gv('client') ?? '').trim() || null;
   const description = (gv('desc')   ?? '').trim();
   const isFixed     = e.fixed_price != null;
+  const isExpense   = isCheltuialaEntry(e);
   const hours       = isFixed ? 0 : Number(gv('hours') ?? e.hours);
   const fixed_price = isFixed ? (gv('fixed_price') !== '' ? Number(gv('fixed_price')) : e.fixed_price) : null;
+  const fixed_type  = isExpense ? cheltuialaTypeForCurrency(row.dataset.cheltuialaCurrency) : e.fixed_type;
 
   if (!description) { alert('Descrierea nu poate fi goală.'); return; }
   if (!isFixed && hours <= 0) { alert('Orele trebuie să fie un număr pozitiv.'); return; }
@@ -3031,7 +3088,7 @@ async function saveEntryEdit(id) {
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '…'; }
 
   const { data, error } = await db.from('entries')
-    .update({ date, client, description, hours, fixed_price })
+    .update({ date, client, description, hours, fixed_price, fixed_type })
     .eq('id', id).select().single();
 
   if (error) {
@@ -3067,10 +3124,22 @@ function cancelEntryEdit(id) {
   _restoreEntryRow(row, e);
 }
 
+function setEntryCheltuialaCurrency(id, currency) {
+  const row = document.querySelector(`tr[data-entry-id="${id}"]`);
+  if (!row) return;
+  const normalized = currency === 'EUR' ? 'EUR' : 'MDL';
+  row.dataset.cheltuialaCurrency = normalized;
+  const input = row.querySelector('[data-f="fixed_price"]');
+  if (input) input.placeholder = normalized;
+  document.querySelectorAll(`#edit-cheltuiala-currency-${id} .toggle-btn`).forEach(button => {
+    button.classList.toggle('active', button.textContent.trim() === normalized);
+  });
+}
+
 function _restoreEntryRow(row, e) {
   delete row.dataset.editing;
   const isFixed   = e.fixed_price != null;
-  const val       = isFixed ? fmtMoney(e.fixed_price) : Number(e.hours).toFixed(1) + 'h';
+  const val       = isFixed ? fmtEntryFixedAmount(e) : Number(e.hours).toFixed(1) + 'h';
   const billedIds = new Set(allInvoiceEntries.map(ie => ie.entry_id));
   const badge     = (billedIds.has(e.id) ? '<span class="badge-billed">facturat</span>' : '')
     + (e.pro_bono ? '<span class="badge-probono">pro bono</span>' : '');
@@ -3431,7 +3500,7 @@ function renderAdminPontaj(container) {
             <tbody>
               ${pageEntries.map(e => {
                 const u = userMap[e.user_id];
-                const val = e.fixed_price != null ? fmtMoney(e.fixed_price) : Number(e.hours).toFixed(1) + 'h';
+                const val = e.fixed_price != null ? fmtEntryFixedAmount(e) : Number(e.hours).toFixed(1) + 'h';
                 const billedBadge = (billedIds.has(e.id) ? '<span class="badge-billed">facturat</span>' : '')
                   + (e.pro_bono ? '<span class="badge-probono">pro bono</span>' : '');
                 return `
@@ -4825,7 +4894,7 @@ function _filterInvEntries() {
     <div style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:3px">
       ${entries.map(e => {
         const u   = userMap[e.user_id];
-        const val = e.fixed_price != null ? fmtMoney(e.fixed_price) : Number(e.hours).toFixed(1) + 'h';
+        const val = e.fixed_price != null ? fmtEntryFixedAmount(e) : Number(e.hours).toFixed(1) + 'h';
         return `
           <label style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:13px;transition:background .1s"
             onmouseover="this.style.background='rgba(200,169,110,.06)'" onmouseout="this.style.background='none'">
@@ -5909,7 +5978,7 @@ function viewInvoice(id) {
         <tbody>
           ${invEntries.map(e => {
             const u   = userMap[e.user_id];
-            const val = e.fixed_price != null ? fmtMoney(e.fixed_price) : Number(e.hours).toFixed(1) + 'h';
+            const val = e.fixed_price != null ? fmtEntryFixedAmount(e) : Number(e.hours).toFixed(1) + 'h';
             return `<tr>
               <td style="padding:9px 10px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--surface2)">${fmtDate(e.date)}</td>
               <td style="padding:9px 10px;font-size:13px;border-bottom:1px solid var(--surface2)">${u?.name||'—'}</td>
@@ -6141,17 +6210,17 @@ function showActPricingStep() {
   const userMap = Object.fromEntries(allUsers.map(u => [u.id, u]));
   const entries = _actMatchingEntries(s.clientName);
   const hourlyEntries    = entries.filter(e => e.fixed_price == null);
-  const onorariuEntries  = entries.filter(e => e.fixed_price != null && e.fixed_type !== 'cheltuiala');
-  const cheltuialaEntries = entries.filter(e => e.fixed_price != null && e.fixed_type === 'cheltuiala');
+  const onorariuEntries  = entries.filter(e => e.fixed_price != null && !isCheltuialaEntry(e));
+  const cheltuialaEntries = entries.filter(e => e.fixed_price != null && isCheltuialaEntry(e));
 
   const priceRow = e => {
-    const switchable = CURRENCY_TOGGLE_LABELS.includes(e.description);
-    const cur = s.priceOverrideCurrencies[e.id] || 'MDL';
+    const switchable = !isCheltuialaEntry(e) && CURRENCY_TOGGLE_LABELS.includes(e.description);
+    const cur = isCheltuialaEntry(e) ? getCheltuialaCurrency(e) : (s.priceOverrideCurrencies[e.id] || 'MDL');
     return `
     <div style="display:flex;align-items:center;gap:10px">
       <div style="flex:1;min-width:0">
         <div style="font-size:13px">${esc(e.description)}</div>
-        <div style="font-size:11px;color:var(--muted)">${fmtDate(e.date)} · ${userMap[e.user_id]?.name || '—'} · standard ${fmtMoney(Number(e.fixed_price))}</div>
+        <div style="font-size:11px;color:var(--muted)">${fmtDate(e.date)} · ${userMap[e.user_id]?.name || '—'} · standard ${fmtEntryFixedAmount(e)}</div>
       </div>
       ${switchable ? currencyToggleHtml(cur, `setPriceCurrency('${e.id}','MDL')`, `setPriceCurrency('${e.id}','EUR')`) : ''}
       <input type="number" class="ps-price-override" data-entry-id="${e.id}" min="0" step="50" style="width:110px;flex-shrink:0" value="${s.priceOverrides[e.id] ?? e.fixed_price}">
@@ -6192,7 +6261,7 @@ function showActPricingStep() {
       </div>` : ''}
 
       <div>
-        <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px">Cheltuieli (MDL) pentru acest act</div>
+        <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px">Cheltuieli pentru acest act</div>
         ${cheltuialaEntries.length
           ? `<div style="display:flex;flex-direction:column;gap:10px">${cheltuialaEntries.map(priceRow).join('')}</div>`
           : `<p style="font-size:13px;color:var(--muted)">Nicio cheltuială introdusă de avocați pentru acest client în această perioadă.</p>`
@@ -6200,7 +6269,7 @@ function showActPricingStep() {
         <div style="display:flex;align-items:center;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
           <div style="flex:1;min-width:0">
             <div style="font-size:13px">Cheltuieli</div>
-            <div style="font-size:11px;color:var(--muted)">Sumă suplimentară, adăugată manual pentru acest act</div>
+            <div style="font-size:11px;color:var(--muted)">Sumă suplimentară în MDL, adăugată manual pentru acest act</div>
           </div>
           <input type="number" id="ps-extra-cheltuieli" class="ps-price-override" min="0" step="10" style="width:110px;flex-shrink:0" value="${s.extraCheltuieli || 0}">
         </div>
@@ -6317,21 +6386,34 @@ async function generateAct() {
   // lawyer's rate still show on the act.
   function entryOnorariu(e) {
     if (e.pro_bono) return 0;
-    if (e.fixed_type === 'cheltuiala') return 0;
+    if (isCheltuialaEntry(e)) return 0;
     if (e.fixed_price != null) return fs.priceOverrides[e.id] ?? e.fixed_price;
     return Number(e.hours) * rateForEntry(e);
   }
   function entryCheltuiala(e) {
     if (e.pro_bono) return 0;
-    if (e.fixed_type !== 'cheltuiala' || e.fixed_price == null) return 0;
+    if (!isCheltuialaEntry(e) || e.fixed_price == null) return 0;
     return fs.priceOverrides[e.id] ?? e.fixed_price;
   }
 
+  function onorariuCurrency(e) {
+    if (e.fixed_price == null) return fs.rateOverrideCurrency;
+    return CURRENCY_TOGGLE_LABELS.includes(e.description)
+      ? (fs.priceOverrideCurrencies[e.id] || 'MDL')
+      : 'MDL';
+  }
+
   const extraCheltuieli = fs.extraCheltuieli || 0;
-  const totalOnorariu   = entries.reduce((s, e) => s + (e.fixed_price != null ? entryOnorariu(e) : 0), 0);
-  const totalCheltuieli = entries.reduce((s, e) => s + entryCheltuiala(e), 0) + extraCheltuieli;
-  const totalEur        = entries.reduce((s, e) => (e.fixed_price == null && !e.pro_bono) ? s + Number(e.hours) * rateForEntry(e) : s, 0);
-  const grandTotal      = totalOnorariu + totalCheltuieli;
+  const onorariuTotals = entries.reduce((totals, e) => {
+    const amount = entryOnorariu(e);
+    totals[onorariuCurrency(e)] += amount;
+    return totals;
+  }, { MDL: 0, EUR: 0 });
+  const cheltuieliTotals = entries.reduce((totals, e) => {
+    const amount = entryCheltuiala(e);
+    totals[getCheltuialaCurrency(e)] += amount;
+    return totals;
+  }, { MDL: extraCheltuieli, EUR: 0 });
 
   const fmtEur = n => n.toLocaleString('ro-RO', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' EUR';
   const fmtByCurrency = (n, cur) => cur === 'MDL' ? fmtMoney(n) : fmtEur(n);
@@ -6348,7 +6430,9 @@ async function generateAct() {
   const _clientTotals = {};
   entries.forEach(e => {
     const key = (e.client || '').trim() || '__none__';
-    _clientTotals[key] = (_clientTotals[key] || 0) + entryOnorariu(e) + entryCheltuiala(e);
+    const onorariuMdl = onorariuCurrency(e) === 'EUR' ? entryOnorariu(e) * rate : entryOnorariu(e);
+    const cheltuialaMdl = getCheltuialaCurrency(e) === 'EUR' ? entryCheltuiala(e) * rate : entryCheltuiala(e);
+    _clientTotals[key] = (_clientTotals[key] || 0) + onorariuMdl + cheltuialaMdl;
   });
   if (extraCheltuieli > 0) {
     const key = (clientName || '').trim() || '__none__';
@@ -6359,23 +6443,12 @@ async function generateAct() {
 
   const contractDateFmt = contractDate ? fmtDate(contractDate) : '___________';
   // Convert each entry to MDL using its displayed currency so the grand total matches what's shown in the table.
-  const totalMdlComplete = bnmRate != null ? (() => {
-    let mdl = 0;
-    entries.forEach(e => {
-      if (e.pro_bono) return; // billed at nothing — never reaches the BNM total
-      if (e.fixed_price == null) {
-        const amt = Number(e.hours) * rateForEntry(e);
-        mdl += fs.rateOverrideCurrency === 'EUR' ? amt * bnmRate : amt;
-      } else if (e.fixed_type !== 'cheltuiala' && e.fixed_price != null) {
-        const amt = entryOnorariu(e);
-        const cur = CURRENCY_TOGGLE_LABELS.includes(e.description)
-          ? (fs.priceOverrideCurrencies[e.id] || 'MDL') : 'MDL';
-        mdl += cur === 'EUR' ? amt * bnmRate : amt;
-      }
-    });
-    mdl += totalCheltuieli + birouExtra;
-    return Math.round(mdl);
-  })() : null;
+  const totalMdlComplete = bnmRate != null
+    ? Math.round(
+        onorariuTotals.MDL + cheltuieliTotals.MDL + birouExtra
+        + (onorariuTotals.EUR + cheltuieliTotals.EUR) * bnmRate
+      )
+    : null;
   const firmDisplay   = firm || 'BIROUL ASOCIAT DE AVOCAȚI';
   const coordDisplay  = coordinator || '___________';
   const clientDisplay = clientName || '___________';
@@ -6483,7 +6556,7 @@ async function generateAct() {
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${hoursDisplay}</td>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${rateDisplay}</td>
                 <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${sumaDisplay}</td>
-                <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${chel > 0 ? fmtMoney(chel) : '—'}</td>
+                <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${chel > 0 ? fmtByCurrency(chel, getCheltuialaCurrency(e)) : '—'}</td>
               </tr>
             `;
           }).join('')}
@@ -6505,27 +6578,8 @@ async function generateAct() {
             </td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${totalHours > 0 ? totalHours.toFixed(1) + ' ore' : '—'}</td>
             <td style="border:1px solid #000;padding:5px 6px;text-align:center;">—</td>
-            <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${(() => {
-              // Sum each row's amount into the bucket matching its displayed currency.
-              let eurSum = 0, mdlSum = 0;
-              entries.forEach(e => {
-                if (e.pro_bono) return; // billed at nothing — never reaches the printed total
-                if (e.fixed_price == null) {
-                  const amt = Number(e.hours) * rateForEntry(e);
-                  if (fs.rateOverrideCurrency === 'EUR') eurSum += amt; else mdlSum += amt;
-                } else if (e.fixed_type !== 'cheltuiala' && e.fixed_price != null) {
-                  const amt = entryOnorariu(e);
-                  const cur = CURRENCY_TOGGLE_LABELS.includes(e.description)
-                    ? (fs.priceOverrideCurrencies[e.id] || 'MDL') : 'MDL';
-                  if (cur === 'EUR') eurSum += amt; else mdlSum += amt;
-                }
-              });
-              const parts = [];
-              if (eurSum > 0) parts.push(fmtEur(eurSum));
-              if (mdlSum > 0) parts.push(fmtMoney(mdlSum));
-              return parts.length ? parts.join(' + ') : '—';
-            })()}</td>
-            <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${totalCheltuieli + birouExtra > 0 ? fmtMoney(totalCheltuieli + birouExtra) : '—'}</td>
+            <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${fmtSplitAmounts(onorariuTotals.MDL, onorariuTotals.EUR)}</td>
+            <td style="border:1px solid #000;padding:5px 6px;text-align:center;">${fmtSplitAmounts(cheltuieliTotals.MDL + birouExtra, cheltuieliTotals.EUR)}</td>
           </tr>
         </tbody>
       </table>
@@ -6577,7 +6631,9 @@ async function generateAct() {
   fs.saveData = {
     clientName, contractNr,
     periodStart: state.dateStart, periodEnd: state.dateEnd,
-    totalHours, totalEur, totalMdl: grandTotal + birouExtra,
+    totalHours,
+    totalEur: onorariuTotals.EUR + cheltuieliTotals.EUR,
+    totalMdl: onorariuTotals.MDL + cheltuieliTotals.MDL + birouExtra,
     totalMdlComplete,
     documentHtml: actDocHtml,
   };
