@@ -6752,7 +6752,16 @@ async function generateAct() {
     </div>
   `;
 
-  document.getElementById('modal-body').innerHTML = actDocHtml;
+  // Without a BNM rate the act silently loses its "TOTAL GENERAL ÎN MDL" line
+  // and any EUR amount is treated as 1:1 with MDL when computing the office
+  // surcharge — so say so out loud instead of handing over a quietly wrong act.
+  // Kept out of actDocHtml on purpose: that string is what gets saved to the
+  // database, and the warning must not resurface when the act is reopened later.
+  const bnmWarningHtml = bnmRate == null ? `
+    <p class="act-edit-hint" style="font-family:'DM Sans',sans-serif;font-size:13px;line-height:1.5;color:#d9a441;background:rgba(217,164,65,.1);border:1px solid rgba(217,164,65,.4);border-radius:8px;padding:10px 14px;margin-bottom:12px">
+      Cursul BNM nu a putut fi generat, reîmprospătați pagina și încercați din nou acum sau mai târziu.
+    </p>` : '';
+  document.getElementById('modal-body').innerHTML = bnmWarningHtml + actDocHtml;
   document.getElementById('modal-overlay').style.display = 'flex';
 
   // Snapshot everything saveActToClient() needs — it's a plain global function
