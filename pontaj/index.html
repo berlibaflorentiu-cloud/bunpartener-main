@@ -822,12 +822,16 @@
       font-size: 12px; color: var(--muted); text-transform: uppercase;
       letter-spacing: 0.1em; margin-top: 4px;
     }
-    /* .toggle-group is display:flex, a block-level box that fills its
-       container's width by default just like a plain div would — same
-       reason .field inputs get width:100%. inline-flex sizes it to its own
-       two buttons instead, regardless of what kind of parent it sits in. */
+    /* .toggle-group is display:flex, so it fills its container's width by
+       default just like a plain div would — same reason .field inputs get
+       width:100%. width:fit-content sizes it to its own two buttons instead.
+       (display:inline-flex looked like the fix but doesn't survive being a
+       flex item: a flex/grid child's outer display always "blockifies" back
+       to flex, per spec, so it silently no-ops for #oferta-cause-toggle,
+       which sits inside .field — a flex column. fit-content isn't a display
+       value, so it isn't blockified and works inside any parent type.) */
     .oferta-form #oferta-cause-toggle,
-    .oferta-form #oferta-onorariu-currency-toggle { display: inline-flex; }
+    .oferta-form #oferta-onorariu-currency-toggle { width: fit-content; }
     .oferta-static-value {
       background: var(--surface2);
       border: 1px solid var(--border);
