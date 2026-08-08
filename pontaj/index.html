@@ -7333,8 +7333,21 @@ function oferteActivitiesHtml() {
   return rows;
 }
 
+// Cached like the Act's own stamp fetch — kicked off once per tab visit and
+// reused; ofertaDocHtml() runs synchronously on every keystroke so it can't
+// await the download itself, it just reads whatever's cached so far and the
+// preview re-renders once the fetch resolves. hydrateActPrivateAssets()
+// still runs before PDF export as a safety net if this hasn't resolved yet.
+let _ofertaStampDataUrl = null;
+
 function renderOferte(container) {
   if (!_ofertaState) _ofertaState = _defaultOfertaState();
+  if (_ofertaStampDataUrl == null) {
+    getActStampDataUrl().then(url => {
+      _ofertaStampDataUrl = url;
+      renderOfertaPreview();
+    }).catch(() => { /* stays unset — hydrateActPrivateAssets() retries at export time */ });
+  }
   const s = _ofertaState;
   container.innerHTML = `
     <div class="oferta-layout">
@@ -7485,7 +7498,7 @@ function ofertaDocHtml() {
 
   return `
     <div style="text-align:center;margin-bottom:24px;">
-      <img src="${ACT_LOGO_PNG}" style="max-width:320px;">
+      <img src="${ACT_LOGO_PNG}" style="display:block;margin:0 auto;max-width:240px;height:auto;">
     </div>
     <div style="text-align:center;margin-bottom:24px;">
       <p style="font-weight:bold;color:#000058;font-size:13pt;margin:0;">OFERTĂ JURIDICĂ ȘI FINANCIARĂ</p>
@@ -7566,16 +7579,21 @@ function ofertaDocHtml() {
       În contextul unei colaborări fructuoase, luând în vedere inclusiv speranța că oferta propusă este una corespunzătoare și Vă satisface cerințele promovate, suntem la dispoziția Dumneavoastră pentru orice detalii suplimentare.
     </p>
 
-    <table style="width:100%;border-collapse:collapse;font-size:10pt;">
-      <tr>
-        <td style="width:55%;vertical-align:top;">
-          <p style="margin:0;"><em><strong>Cu deosebită considerație,</strong></em> <strong>${esc(coordinator)}</strong></p>
-        </td>
-        <td style="width:45%;vertical-align:top;">
-          <p style="margin:0;">conferențiar universitar,<br>doctor habilitat în drept,<br>avocat coordonator -<br><strong>BAA „${berliba}”</strong></p>
-        </td>
-      </tr>
-    </table>`;
+    <div style="font-size:10pt;">
+      <p style="margin:0;"><em><strong>Cu deosebită considerație,</strong></em></p>
+      <p style="margin:0;"><strong>${esc(coordinator)}</strong></p>
+      <p style="margin:0;">conferențiar universitar,<br>doctor habilitat în drept,<br>avocat coordonator -<br><strong>BAA „${berliba}”</strong></p>
+      <div class="act-firm-stamp" style="margin-top:3mm;">
+        <img
+          class="act-stamp-img"
+          data-private-storage-path="${ACT_STAMP_PATH}"
+          ${_ofertaStampDataUrl ? `src="${_ofertaStampDataUrl}"` : ''}
+          width="168" height="165"
+          alt="Ștampila BAA Berliba și Partenerii"
+          style="display:block;width:${ACT_STAMP_WIDTH_MM}mm;height:${ACT_STAMP_HEIGHT_MM}mm;max-width:none;object-fit:fill;"
+        >
+      </div>
+    </div>`;
 }
 
 async function downloadOferta() {
@@ -7585,6 +7603,7 @@ async function downloadOferta() {
   const slug = (_ofertaState.clientName || 'client').toLowerCase()
                  .replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
   try {
+    await hydrateActPrivateAssets(el);
     const pdf = await _buildActPdfDocument(el);
     pdf.save(`oferta-${slug}-${date}.pdf`);
   } catch (error) {
