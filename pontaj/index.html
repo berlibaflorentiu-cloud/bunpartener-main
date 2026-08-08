@@ -259,13 +259,35 @@
       gap: 12px;
     }
     .toggle-group {
+      position: relative;
       display: flex;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 3px;
     }
+    /* The gold fill is this sliding pill, not a per-button background — that's
+       what lets it glide from one side to the other instead of just flipping
+       color. Sized to exactly one (equal-width) button via the same 3px
+       padding used on all four sides, so translateX(100%) — 100% of the
+       pill's own width — lands it flush against the opposite padding edge. */
+    .toggle-group::before {
+      content: '';
+      position: absolute;
+      top: 3px; bottom: 3px; left: 3px;
+      width: calc(50% - 3px);
+      background: var(--gold);
+      border-radius: 5px;
+      transform: translateX(0%);
+      transition: transform 0.35s cubic-bezier(.65,0,.35,1);
+      z-index: 0;
+    }
+    .toggle-group[data-active="1"]::before { transform: translateX(100%); }
     .toggle-btn {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      text-align: center;
       background: none;
       border: none;
       color: var(--muted);
@@ -275,10 +297,11 @@
       padding: 6px 18px;
       border-radius: 5px;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: color 0.25s;
     }
-    .toggle-btn.active { background: var(--gold); color: var(--bg); }
+    .toggle-btn.active { color: var(--bg); }
     .toggle-group.sm { padding: 2px; flex-shrink: 0; }
+    .toggle-group.sm::before { top: 2px; bottom: 2px; left: 2px; width: calc(50% - 2px); }
     .toggle-group.sm .toggle-btn { padding: 5px 10px; font-size: 11px; min-height: 0; }
 
     /* ── STATS ── */
@@ -1096,6 +1119,7 @@
 
     /* Currency toggle sized for an inline table-cell edit (Registru row edit) */
     .toggle-group.regcell { border-color: var(--gold); padding: 2px; margin-top: 5px; width: 72px; box-sizing: border-box; }
+    .toggle-group.regcell::before { top: 2px; bottom: 2px; left: 2px; width: calc(50% - 2px); }
     .toggle-group.regcell .toggle-btn { flex: 1; padding: 3px 0; font-size: 10px; }
 
     /* ── INVOICES ── */
@@ -2786,6 +2810,7 @@ function setCheltuialaCurrency(currency) {
   document.querySelectorAll('#c-currency-toggle .toggle-btn').forEach(button => {
     button.classList.toggle('active', button.textContent.trim() === normalized);
   });
+  syncToggleIndicator(document.getElementById('c-currency-toggle'));
 }
 
 // ── Avansuri — admin CRUD, recipient read-only ──────────
@@ -3364,6 +3389,7 @@ function setEntryCheltuialaCurrency(id, currency) {
   document.querySelectorAll(`#edit-cheltuiala-currency-${id} .toggle-btn`).forEach(button => {
     button.classList.toggle('active', button.textContent.trim() === normalized);
   });
+  syncToggleIndicator(document.getElementById(`edit-cheltuiala-currency-${id}`));
 }
 
 function _restoreEntryRow(row, e) {
@@ -3475,7 +3501,7 @@ function renderAdminTabSettings() {
   document.getElementById('modal-body').innerHTML = `
     <div style="margin-bottom:18px">
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:9px">Prezentarea avocaților în Pontaj</div>
-      <div class="toggle-group" style="display:inline-flex">
+      <div class="toggle-group" id="admin-lawyerview-toggle" data-active="${_adminLawyerViewDraft==='compact'?1:0}" style="display:inline-flex">
         <button class="toggle-btn${_adminLawyerViewDraft==='cards'?' active':''}" onclick="setAdminLawyerViewDraft('cards')">Carduri</button>
         <button class="toggle-btn${_adminLawyerViewDraft==='compact'?' active':''}" onclick="setAdminLawyerViewDraft('compact')">Listă compactă</button>
       </div>
@@ -3511,7 +3537,12 @@ function renderAdminTabSettings() {
 
 function setAdminLawyerViewDraft(view) {
   _adminLawyerViewDraft = view === 'compact' ? 'compact' : 'cards';
-  renderAdminTabSettings();
+  const toggle = document.getElementById('admin-lawyerview-toggle');
+  if (!toggle) { renderAdminTabSettings(); return; }
+  toggle.querySelectorAll('.toggle-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim() === (_adminLawyerViewDraft === 'compact' ? 'Listă compactă' : 'Carduri'));
+  });
+  syncToggleIndicator(toggle);
 }
 
 function moveAdminTabPreference(key, delta) {
@@ -5307,6 +5338,7 @@ function setRgCurrency(cur) {
   document.querySelectorAll('#rg-currency-toggle .toggle-btn').forEach(b => {
     b.classList.toggle('active', b.textContent.trim() === cur);
   });
+  syncToggleIndicator(document.getElementById('rg-currency-toggle'));
 }
 
 async function addReceipt() {
@@ -5380,6 +5412,7 @@ function setEditCurrency(id, cur) {
   document.querySelectorAll(`#edit-currency-${id} .toggle-btn`).forEach(b => {
     b.classList.toggle('active', b.textContent.trim() === cur);
   });
+  syncToggleIndicator(document.getElementById(`edit-currency-${id}`));
 }
 
 async function saveReceiptEdit(id) {
@@ -6502,10 +6535,22 @@ const CURRENCY_TOGGLE_LABELS = ['Ședința de judecată', 'Acțiunea de urmărir
 
 function currencyToggleHtml(current, onMdl, onEur, size = 'sm') {
   return `
-    <div class="toggle-group ${size}" role="group" aria-label="Monedă">
+    <div class="toggle-group ${size}" data-active="${current === 'EUR' ? 1 : 0}" role="group" aria-label="Monedă">
       <button type="button" class="toggle-btn${current === 'MDL' ? ' active' : ''}" onclick="${onMdl}">MDL</button>
       <button type="button" class="toggle-btn${current === 'EUR' ? ' active' : ''}" onclick="${onEur}">EUR</button>
     </div>`;
+}
+
+// Moves a toggle-group's sliding pill to whichever button carries .active —
+// call after toggling .active in place so the CSS transition can animate,
+// instead of destroying and recreating the toggle-group's DOM node.
+function syncToggleIndicator(container) {
+  if (!container) return;
+  const group = container.classList.contains('toggle-group') ? container : container.querySelector('.toggle-group');
+  if (!group) return;
+  const btns = [...group.querySelectorAll('.toggle-btn')];
+  const idx = Math.max(0, btns.findIndex(b => b.classList.contains('active')));
+  group.dataset.active = idx;
 }
 
 function showActPricingStep() {
@@ -7311,7 +7356,7 @@ function _defaultOfertaState() {
 
 function causeToggleHtml(current) {
   return `
-    <div class="toggle-group" id="oferta-cause-toggle" role="group" aria-label="Tipul cauzei">
+    <div class="toggle-group" id="oferta-cause-toggle" data-active="${current === 'civilă' ? 1 : 0}" role="group" aria-label="Tipul cauzei">
       <button type="button" class="toggle-btn${current === 'penală' ? ' active' : ''}" onclick="setOfertaCauseType('penală')">Penală</button>
       <button type="button" class="toggle-btn${current === 'civilă' ? ' active' : ''}" onclick="setOfertaCauseType('civilă')">Civilă</button>
     </div>`;
@@ -7322,17 +7367,20 @@ function causeToggleHtml(current) {
 // — it's a display label only, the typed numbers are never converted.
 function onorariuCurrencyToggleHtml(current) {
   return `
-    <div class="toggle-group" id="oferta-onorariu-currency-toggle" role="group" aria-label="Moneda onorariului">
+    <div class="toggle-group" id="oferta-onorariu-currency-toggle" data-active="${current === 'MDL' ? 1 : 0}" role="group" aria-label="Moneda onorariului">
       <button type="button" class="toggle-btn${current === 'EUR' ? ' active' : ''}" onclick="setOfertaOnorariuCurrency('EUR')">EUR</button>
       <button type="button" class="toggle-btn${current === 'MDL' ? ' active' : ''}" onclick="setOfertaOnorariuCurrency('MDL')">MDL</button>
     </div>`;
 }
 
-function ofertaOnorariuFieldsHtml() {
+// Split from the toggle itself so a currency switch never recreates the
+// toggle-group's DOM node — only these label/input fields get replaced,
+// letting the toggle's own pill glide via CSS transition instead of
+// snapping to its new spot.
+function ofertaOnorariuLabelsHtml() {
   const s = _ofertaState;
   const cur = s.onorariuCurrency === 'MDL' ? 'MDL' : 'EUR';
   return `
-    ${onorariuCurrencyToggleHtml(cur)}
     <div class="field">
       <label>Tarif (${cur}/oră)</label>
       <input type="number" min="0" step="1" value="${esc(s.tarif)}" placeholder="ex. 70" oninput="updateOfertaField('tarif', this.value)">
@@ -7347,9 +7395,25 @@ function ofertaOnorariuFieldsHtml() {
     </div>`;
 }
 
+function ofertaOnorariuFieldsHtml() {
+  const s = _ofertaState;
+  const cur = s.onorariuCurrency === 'MDL' ? 'MDL' : 'EUR';
+  return `
+    ${onorariuCurrencyToggleHtml(cur)}
+    <div id="oferta-onorariu-labels">${ofertaOnorariuLabelsHtml()}</div>`;
+}
+
 function setOfertaOnorariuCurrency(value) {
   _ofertaState.onorariuCurrency = value;
-  document.getElementById('oferta-onorariu-fields').innerHTML = ofertaOnorariuFieldsHtml();
+  const toggle = document.getElementById('oferta-onorariu-currency-toggle');
+  if (toggle) {
+    toggle.querySelectorAll('.toggle-btn').forEach(b => {
+      b.classList.toggle('active', b.textContent.trim() === value);
+    });
+    syncToggleIndicator(toggle);
+  }
+  const labels = document.getElementById('oferta-onorariu-labels');
+  if (labels) labels.innerHTML = ofertaOnorariuLabelsHtml();
   renderOfertaPreview();
 }
 
@@ -7455,7 +7519,12 @@ function updateOfertaField(field, value) {
 function setOfertaCauseType(type) {
   _ofertaState.causeType = type;
   const toggle = document.getElementById('oferta-cause-toggle');
-  if (toggle) toggle.outerHTML = causeToggleHtml(type);
+  if (toggle) {
+    toggle.querySelectorAll('.toggle-btn').forEach(b => {
+      b.classList.toggle('active', b.textContent.trim().toLowerCase() === type);
+    });
+    syncToggleIndicator(toggle);
+  }
   renderOfertaPreview();
 }
 
