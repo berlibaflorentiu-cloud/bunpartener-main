@@ -6820,7 +6820,11 @@ async function generateAct() {
             ${idno ? `IDNO: ${idno}<br>` : ''}
             ${ibanMdl ? `IBAN: ${ibanMdl} (MDL)<br>` : ''}
             ${bank ? `${bank}<br>` : ''}
-            <div class="act-firm-signature" style="height:${ACT_STAMP_HEIGHT_MM}mm;margin-top:3mm;">
+            <br><br>
+            <div style="border-bottom:1px solid #000;"></div>
+            <div style="text-align:center;font-size:9pt;">(semnătura)</div>
+            <div style="text-align:right;">Nume, prenume: <strong>${coordinatorDisplay}</strong><br>Poziția: <strong>avocat coordonator</strong></div>
+            <div class="act-firm-stamp" style="margin-top:3mm;">
               <img
                 class="act-stamp-img"
                 data-private-storage-path="${ACT_STAMP_PATH}"
@@ -6830,9 +6834,6 @@ async function generateAct() {
                 style="display:block;margin-left:1.5mm;width:${ACT_STAMP_WIDTH_MM}mm;height:${ACT_STAMP_HEIGHT_MM}mm;max-width:none;object-fit:fill;"
               >
             </div>
-            <div style="border-bottom:1px solid #000;"></div>
-            <div style="text-align:center;font-size:9pt;">(semnătura)</div>
-            <div style="text-align:right;">Nume, prenume: <strong>${coordinatorDisplay}</strong><br>Poziția: <strong>avocat coordonator</strong></div>
           </td>
           <td style="width:50%;vertical-align:top;padding-left:20px;border:0;">
             ${clientDet ? `<strong>${clientDisplay}</strong><br>${clientDet}` : `<strong>${clientDisplay}</strong>`}
