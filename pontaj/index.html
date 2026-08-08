@@ -783,6 +783,19 @@
        wrong for this document, which is styled light/print-like. */
     #act-document tr:hover td { background: none; }
     #act-document .act-services-table { table-layout: fixed; }
+    /* html2canvas renders the whole act as one tall bitmap, which jsPDF then
+       slices at fixed page heights — nothing stops it cutting through the
+       middle of a table row or a line of text, which is exactly what produced
+       half-rows and sliced signatures across page boundaries. These rules are
+       what html2pdf's 'css' pagebreak mode reads (and the browser honours when
+       printing), so a row that would straddle a break moves down whole. */
+    #act-document tr,
+    #act-document img,
+    #act-document p { break-inside: avoid; page-break-inside: avoid; }
+    /* A break directly after a heading would orphan it at the page foot. */
+    #act-document h1, #act-document h2, #act-document h3 {
+      break-after: avoid; page-break-after: avoid;
+    }
     #act-document .act-lawyer-cell {
       white-space: nowrap;
       word-break: keep-all;
@@ -6852,6 +6865,9 @@ async function downloadDocx() {
     td, th { border: 1px solid #000; padding: 4px 6px; font-size: 10pt; }
     th { text-align: center; font-size: 9pt; text-transform: uppercase; }
     .act-lawyer-cell { white-space: nowrap; word-break: keep-all; font-size: 9pt; line-height: 1.15; }
+    /* Same reason as the PDF/print path: keep a row whole rather than letting
+       it straddle a page boundary. */
+    tr { page-break-inside: avoid; break-inside: avoid; }
   </style></head><body>${clone.outerHTML}</body></html>`;
 
   const docBlob = new Blob(['﻿', html], { type: 'application/msword' });
@@ -6872,6 +6888,10 @@ function downloadReport() {
     image:    { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' },
     jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    // Without this html2pdf just slices one tall bitmap at fixed page heights,
+    // cutting table rows and signature blocks in half. 'avoid' measures these
+    // elements and pushes a whole one to the next page instead of splitting it.
+    pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'img'] },
   }).from(el).save();
 }
 
