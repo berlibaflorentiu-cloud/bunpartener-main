@@ -6882,7 +6882,166 @@ async function downloadDocx() {
   saveAs(docBlob, `act-predare-primire-${slug}-${date}.doc`);
 }
 
-function downloadReport() {
+const ACT_PDF_LAYOUT = Object.freeze({
+  pageWidthMm: 210,
+  pageHeightMm: 297,
+  marginTopMm: 15,
+  marginRightMm: 18,
+  marginBottomMm: 15,
+  marginLeftMm: 18,
+  // 174 mm at the browser's standard 96 CSS pixels/inch. Keeping this fixed
+  // is what makes line wrapping identical at localhost, on the live origin,
+  // at any modal position, and at any browser zoom level.
+  contentWidthPx: 658,
+});
+
+async function _waitForActPdfAssets(root) {
+  if (document.fonts?.ready) await document.fonts.ready;
+  await Promise.all([...root.querySelectorAll('img')].map(img => {
+    if (img.complete) {
+      return img.naturalWidth > 0 && typeof img.decode === 'function'
+        ? img.decode().catch(() => {})
+        : Promise.resolve();
+    }
+    return new Promise(resolve => {
+      img.addEventListener('load', resolve, { once: true });
+      img.addEventListener('error', resolve, { once: true });
+    });
+  }));
+}
+
+function _actPdfSafeBreaks(root) {
+  const rootRect = root.getBoundingClientRect();
+  const safeBreaks = new Set([0, rootRect.height]);
+  const addBottom = element => {
+    const rect = element.getBoundingClientRect();
+    const bottom = rect.bottom - rootRect.top;
+    if (bottom > 0 && bottom <= rootRect.height + 1) safeBreaks.add(bottom);
+  };
+
+  // Direct children are the document's natural semantic blocks. The services
+  // table is the sole exception: it may span several pages, so each row is a
+  // legal break boundary while the signature table remains one atomic block.
+  [...root.children].forEach(child => {
+    if (child.classList.contains('act-services-table')) {
+      child.querySelectorAll('tr').forEach(addBottom);
+    } else {
+      addBottom(child);
+    }
+  });
+  return [...safeBreaks].sort((a, b) => a - b);
+}
+
+function _actPdfSlices(canvas, rootHeightCssPx, safeBreaksCssPx) {
+  const layout = ACT_PDF_LAYOUT;
+  const contentWidthMm = layout.pageWidthMm - layout.marginLeftMm - layout.marginRightMm;
+  const contentHeightMm = layout.pageHeightMm - layout.marginTopMm - layout.marginBottomMm;
+  const cssToCanvas = canvas.height / rootHeightCssPx;
+  const pageHeightCanvasPx = canvas.width * contentHeightMm / contentWidthMm;
+  const safeBreaks = safeBreaksCssPx.map(value => value * cssToCanvas);
+  const slices = [];
+  let start = 0;
+
+  while (start < canvas.height - 1) {
+    const idealEnd = Math.min(start + pageHeightCanvasPx, canvas.height);
+    let end = idealEnd;
+    if (idealEnd < canvas.height - 1) {
+      // Prefer the furthest complete row/block that fits. Even a relatively
+      // early boundary is better than slicing a long user-entered table row;
+      // that row will then start at the top of the following page.
+      const candidates = safeBreaks.filter(value => value > start + 2 && value <= idealEnd - 2);
+      if (candidates.length) end = candidates[candidates.length - 1];
+    }
+    if (end <= start + 1) end = idealEnd;
+    slices.push({ start, end });
+    start = end;
+  }
+  return slices;
+}
+
+async function _buildActPdfDocument(source) {
+  const layout = ACT_PDF_LAYOUT;
+  const contentWidthMm = layout.pageWidthMm - layout.marginLeftMm - layout.marginRightMm;
+  const host = document.createElement('div');
+  host.id = 'act-pdf-export-host';
+  host.setAttribute('aria-hidden', 'true');
+  // Keep the fixed-size export layout in the viewport but invisible. The
+  // html2canvas clone turns it visible only inside its detached document;
+  // this avoids the blank-canvas behaviour some browsers have for elements
+  // positioned thousands of pixels off-screen.
+  host.style.cssText = `position:fixed;left:0;top:0;width:${layout.contentWidthPx}px;background:#fff;pointer-events:none;opacity:0;z-index:2147483647;`;
+
+  const copy = source.cloneNode(true);
+  copy.id = 'act-document-pdf-clone';
+  copy.removeAttribute('contenteditable');
+  copy.removeAttribute('spellcheck');
+  copy.style.width = `${layout.contentWidthPx}px`;
+  copy.style.minWidth = `${layout.contentWidthPx}px`;
+  copy.style.maxWidth = `${layout.contentWidthPx}px`;
+  copy.style.boxSizing = 'border-box';
+  copy.style.margin = '0';
+  copy.style.outline = 'none';
+  copy.style.transform = 'none';
+  copy.querySelectorAll('[contenteditable]').forEach(element => element.removeAttribute('contenteditable'));
+  host.appendChild(copy);
+  document.body.appendChild(host);
+
+  try {
+    await _waitForActPdfAssets(copy);
+    const rootRect = copy.getBoundingClientRect();
+    const safeBreaks = _actPdfSafeBreaks(copy);
+    const canvas = await html2canvas(copy, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      width: layout.contentWidthPx,
+      // Use a desktop viewport for media-query evaluation while the document
+      // itself retains its fixed A4 content width.
+      windowWidth: 1200,
+      windowHeight: Math.max(document.documentElement.clientHeight, Math.ceil(rootRect.height)),
+      scrollX: 0,
+      scrollY: 0,
+      onclone: clonedDocument => {
+        const clonedHost = clonedDocument.getElementById('act-pdf-export-host');
+        if (clonedHost) clonedHost.style.opacity = '1';
+      },
+    });
+    const slices = _actPdfSlices(canvas, rootRect.height, safeBreaks);
+    const JsPdf = window.jspdf?.jsPDF || window.jsPDF;
+    if (!JsPdf) throw new Error('Generatorul PDF nu este disponibil.');
+    const pdf = new JsPdf({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+    const markW = 26;
+    const markH = markW / (776 / 119);
+
+    slices.forEach((slice, index) => {
+      if (index > 0) pdf.addPage('a4', 'portrait');
+      // A one-pixel overlap retains collapsed table borders at a row boundary
+      // without duplicating any visible line of text.
+      const cropTop = Math.max(0, Math.floor(slice.start - (index > 0 ? 1 : 0)));
+      const cropBottom = Math.min(canvas.height, Math.ceil(slice.end));
+      const cropHeight = Math.max(1, cropBottom - cropTop);
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = cropHeight;
+      const context = pageCanvas.getContext('2d', { alpha: false });
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+      context.drawImage(canvas, 0, cropTop, canvas.width, cropHeight, 0, 0, canvas.width, cropHeight);
+      const renderedHeightMm = cropHeight * contentWidthMm / canvas.width;
+      pdf.addImage(pageCanvas, 'JPEG', layout.marginLeftMm, layout.marginTopMm, contentWidthMm, renderedHeightMm, undefined, 'FAST');
+      pdf.addImage(BUNPARTENER_MARK_PNG, 'PNG', 10, layout.pageHeightMm - 6 - markH, markW, markH);
+      pageCanvas.width = 1;
+      pageCanvas.height = 1;
+    });
+    return pdf;
+  } finally {
+    host.remove();
+  }
+}
+
+async function downloadReport() {
   const el = document.getElementById('act-document');
   if (!el) return;
   const now      = new Date();
@@ -6890,29 +7049,12 @@ function downloadReport() {
   const settings = JSON.parse(localStorage.getItem('pontaj_settings') || '{}');
   const slug     = (settings.lastClient || 'client').toLowerCase()
                      .replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
-  html2pdf().set({
-    margin: [15, 18, 15, 18],
-    filename: `act-predare-primire-${slug}-${date}.pdf`,
-    image:    { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' },
-    jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    // Without this html2pdf just slices one tall bitmap at fixed page heights,
-    // cutting table rows and signature blocks in half. 'avoid' measures these
-    // elements and pushes a whole one to the next page instead of splitting it.
-    pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'img'] },
-  }).from(el).toPdf().get('pdf').then(function (pdf) {
-    // Stamp the BunPartener mark in the lower-left corner of every page.
-    // Drawn as a baked-in PNG (not vector text) so it renders identically
-    // across every PDF viewer instead of depending on base-14 font support.
-    const pageCount  = pdf.internal.getNumberOfPages();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const markW = 26, markH = 26 / (776 / 119); // matches BUNPARTENER_MARK_PNG's pixel aspect ratio
-    const x = 10, y = pageHeight - 6 - markH;
-    for (let i = 1; i <= pageCount; i++) {
-      pdf.setPage(i);
-      pdf.addImage(BUNPARTENER_MARK_PNG, 'PNG', x, y, markW, markH);
-    }
-  }).save();
+  try {
+    const pdf = await _buildActPdfDocument(el);
+    pdf.save(`act-predare-primire-${slug}-${date}.pdf`);
+  } catch (error) {
+    alert('Nu s-a putut genera PDF-ul actului: ' + error.message);
+  }
 }
 
 let _clientModalId = null;
