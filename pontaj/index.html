@@ -7299,6 +7299,7 @@ function _defaultOfertaState() {
     tarif: '',
     tarifDepasire: '',
     avans: '',
+    onorariuCurrency: 'EUR',
   };
 }
 
@@ -7308,6 +7309,42 @@ function causeToggleHtml(current) {
       <button type="button" class="toggle-btn${current === 'penală' ? ' active' : ''}" onclick="setOfertaCauseType('penală')">Penală</button>
       <button type="button" class="toggle-btn${current === 'civilă' ? ' active' : ''}" onclick="setOfertaCauseType('civilă')">Civilă</button>
     </div>`;
+}
+
+// One switch drives the currency label for all three Onorariu cells (tarif,
+// tarif de depășire, avans) and every mention of them in the generated text
+// — it's a display label only, the typed numbers are never converted.
+function onorariuCurrencyToggleHtml(current) {
+  return `
+    <div class="toggle-group" id="oferta-onorariu-currency-toggle" role="group" aria-label="Moneda onorariului">
+      <button type="button" class="toggle-btn${current === 'EUR' ? ' active' : ''}" onclick="setOfertaOnorariuCurrency('EUR')">EUR</button>
+      <button type="button" class="toggle-btn${current === 'MDL' ? ' active' : ''}" onclick="setOfertaOnorariuCurrency('MDL')">MDL</button>
+    </div>`;
+}
+
+function ofertaOnorariuFieldsHtml() {
+  const s = _ofertaState;
+  const cur = s.onorariuCurrency === 'MDL' ? 'MDL' : 'EUR';
+  return `
+    ${onorariuCurrencyToggleHtml(cur)}
+    <div class="field">
+      <label>Tarif (${cur}/oră)</label>
+      <input type="number" min="0" step="1" value="${esc(s.tarif)}" placeholder="ex. 70" oninput="updateOfertaField('tarif', this.value)">
+    </div>
+    <div class="field">
+      <label>Tarif de depășire (${cur}/oră) — opțional</label>
+      <input type="number" min="0" step="1" value="${esc(s.tarifDepasire)}" placeholder="lasă gol pentru —" oninput="updateOfertaField('tarifDepasire', this.value)">
+    </div>
+    <div class="field">
+      <label>Avans (${cur})</label>
+      <input type="number" min="0" step="1" value="${esc(s.avans)}" placeholder="ex. 3800" oninput="updateOfertaField('avans', this.value)">
+    </div>`;
+}
+
+function setOfertaOnorariuCurrency(value) {
+  _ofertaState.onorariuCurrency = value;
+  document.getElementById('oferta-onorariu-fields').innerHTML = ofertaOnorariuFieldsHtml();
+  renderOfertaPreview();
 }
 
 function oferteActivitiesHtml() {
@@ -7393,18 +7430,7 @@ function renderOferte(container) {
         </div>
 
         <div class="oferta-form-section-label">Onorariu</div>
-        <div class="field">
-          <label>Tarif (EUR/oră)</label>
-          <input type="number" min="0" step="1" value="${esc(s.tarif)}" placeholder="ex. 70" oninput="updateOfertaField('tarif', this.value)">
-        </div>
-        <div class="field">
-          <label>Tarif de depășire (EUR/oră) — opțional</label>
-          <input type="number" min="0" step="1" value="${esc(s.tarifDepasire)}" placeholder="lasă gol pentru —" oninput="updateOfertaField('tarifDepasire', this.value)">
-        </div>
-        <div class="field">
-          <label>Avans (EUR)</label>
-          <input type="number" min="0" step="1" value="${esc(s.avans)}" placeholder="ex. 3800" oninput="updateOfertaField('avans', this.value)">
-        </div>
+        <div id="oferta-onorariu-fields">${ofertaOnorariuFieldsHtml()}</div>
 
         <button class="btn-primary" style="margin-top:8px" onclick="downloadOferta()">Descarcă PDF</button>
       </div>
@@ -7484,6 +7510,7 @@ function ofertaDocHtml() {
   const totalOre   = activities.reduce((sum, a) => hasPreset(a) ? sum : sum + (Number(a.hours) || 0), 0);
   const etapaDisplay = s.etapa.trim() || '．．．．．．．．．．．．';
 
+  const onorariuCurrency = s.onorariuCurrency === 'MDL' ? 'MDL' : 'EUR';
   const tarif           = Number(s.tarif) || 0;
   const totalOnorariu   = Math.round(tarif * totalOre);
   const impozitOnorariu = Math.round(totalOnorariu * 0.12);
@@ -7576,13 +7603,13 @@ function ofertaDocHtml() {
       Punând în seamă anumite elemente de ordin obiectiv și subiectiv, s-a decis acordarea unui <em>discount</em> la onorariile percepute, astfel încât acestea vor avea următoarea structură financiară:
     </p>
     <p style="text-align:justify;margin-bottom:8px;color:#000058;">
-      <strong>${totalOnorariu} Euro (inclusiv impozitul în mărime de ${impozitOnorariu} Euro) pentru un volum de activitate de ${totalOre} ${oreLabel(totalOre)}. În cazul în care cuantumul de ${totalOre} ${oreLabel(totalOre)} va fi depășit, plata onorariului se va face pe baza tarifului orar – ${tarifDepasireDisplay} Euro/per oră de activitate în total pentru toți avocații.</strong> Este important de a menționa faptul că numărul de avocați implicați nu influențează cuantumul onorariului, dar acest număr de avocați se decide exclusiv de către ${bunP}.
+      <strong>${totalOnorariu} ${onorariuCurrency} (inclusiv impozitul în mărime de ${impozitOnorariu} ${onorariuCurrency}) pentru un volum de activitate de ${totalOre} ${oreLabel(totalOre)}. În cazul în care cuantumul de ${totalOre} ${oreLabel(totalOre)} va fi depășit, plata onorariului se va face pe baza tarifului orar – ${tarifDepasireDisplay} ${onorariuCurrency}/per oră de activitate în total pentru toți avocații.</strong> Este important de a menționa faptul că numărul de avocați implicați nu influențează cuantumul onorariului, dar acest număr de avocați se decide exclusiv de către ${bunP}.
     </p>
     <p style="text-align:justify;margin-bottom:8px;">
       La fel, atragem atenția că onorariile de mai sus nu includ cheltuielile care pot fi suportate în legătură cu derularea procesului de examinare a cauzei, determinate inclusiv prin cheltuielile de transport, taxele și tarifele percepute de către organele de stat, costurile implicate de curierat și de alte taxe de expediere etc. Aceste cheltuieli vor fi incluse în actul de predare-primire a serviciilor juridice eliberat în formă scrisă.
     </p>
     <p style="text-align:justify;margin-bottom:8px;">
-      În cazul în care veți accepta <strong>OFERTA JURIDICĂ ȘI FINANCIARĂ</strong> <em>(termenul de acțiune a ofertei este până la ${termenLong})</em>, în cel mai curând timp veți avea la dispoziție proiectele Contractelor de asistență juridică cu doi avocați, care va promova condițiile negociate între părți, inclusiv <strong>achitarea, la momentul semnării contractului, a unui onorariu, în avans, în mărime de ${avans} euro (inclusiv impozitul de ${impozitAvans} euro).</strong>
+      În cazul în care veți accepta <strong>OFERTA JURIDICĂ ȘI FINANCIARĂ</strong> <em>(termenul de acțiune a ofertei este până la ${termenLong})</em>, în cel mai curând timp veți avea la dispoziție proiectele Contractelor de asistență juridică cu doi avocați, care va promova condițiile negociate între părți, inclusiv <strong>achitarea, la momentul semnării contractului, a unui onorariu, în avans, în mărime de ${avans} ${onorariuCurrency} (inclusiv impozitul de ${impozitAvans} ${onorariuCurrency}).</strong>
     </p>
     <p style="text-align:justify;margin-bottom:8px;">
       În rest, onorariul avocațial și cheltuielile suportate în interesele clientului vor fi achitate de către client, în momentul transmiterii actului de predare-primire a serviciilor juridice prestate și a lucrărilor îndeplinite.
