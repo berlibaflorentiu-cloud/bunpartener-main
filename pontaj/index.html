@@ -7295,7 +7295,7 @@ function _defaultOfertaState() {
     causeType: 'penală',
     etapa: '',
     clientName: '',
-    activities: [{ desc: '', hours: '', presetIdx: '' }],
+    activities: [{ desc: '', hours: '', presetIdx: '', price: '' }],
     tarif: '',
     tarifDepasire: '',
     avans: '',
@@ -7322,14 +7322,16 @@ function oferteActivitiesHtml() {
         <input type="text" value="${esc(a.desc)}" placeholder="ex. Examinarea materialelor cauzei" oninput="updateOfertaActivity(${i}, 'desc', this.value)">
       </div>
       <div class="field">
-        <label>Ore preconizate</label>
-        <input type="number" min="0" step="0.5" value="${esc(a.hours)}" placeholder="ex. 3" ${isPreset ? 'disabled' : ''} oninput="updateOfertaActivity(${i}, 'hours', this.value)">
+        <label>${isPreset ? 'Preț (MDL)' : 'Ore preconizate'}</label>
+        ${isPreset
+          ? `<input type="number" min="0" step="1" value="${esc(a.price)}" placeholder="ex. 2000" oninput="updateOfertaActivity(${i}, 'price', this.value)">`
+          : `<input type="number" min="0" step="0.5" value="${esc(a.hours)}" placeholder="ex. 3" oninput="updateOfertaActivity(${i}, 'hours', this.value)">`}
       </div>
       <div class="field">
-        <label>...sau o acțiune predefinită (înlocuiește orele cu prețul ei fix)</label>
+        <label>...sau o acțiune predefinită (completează activitatea, iar în loc de ore introduci un preț)</label>
         <select onchange="setOfertaActivityPreset(${i}, this.value)">
           <option value="">— manual, în ore —</option>
-          ${PRESETS.map((p, pi) => `<option value="${pi}"${String(pi) === String(a.presetIdx) ? ' selected' : ''}>${esc(p.label)} — ${p.price.toLocaleString('ro-RO')} MDL</option>`).join('')}
+          ${PRESETS.map((p, pi) => `<option value="${pi}"${String(pi) === String(a.presetIdx) ? ' selected' : ''}>${esc(p.label)}</option>`).join('')}
         </select>
       </div>
     </div>`;
@@ -7426,14 +7428,14 @@ function setOfertaCauseType(type) {
 }
 
 function addOfertaActivity() {
-  _ofertaState.activities.push({ desc: '', hours: '', presetIdx: '' });
+  _ofertaState.activities.push({ desc: '', hours: '', presetIdx: '', price: '' });
   document.getElementById('oferta-activities').innerHTML = oferteActivitiesHtml();
   renderOfertaPreview();
 }
 
 function removeOfertaActivity(i) {
   _ofertaState.activities.splice(i, 1);
-  if (!_ofertaState.activities.length) _ofertaState.activities.push({ desc: '', hours: '', presetIdx: '' });
+  if (!_ofertaState.activities.length) _ofertaState.activities.push({ desc: '', hours: '', presetIdx: '', price: '' });
   document.getElementById('oferta-activities').innerHTML = oferteActivitiesHtml();
   renderOfertaPreview();
 }
@@ -7443,11 +7445,18 @@ function updateOfertaActivity(i, field, value) {
   renderOfertaPreview();
 }
 
-// Picking a predefined action replaces that row's hours entirely with the
-// action's own fixed price — the two are mutually exclusive, not combined.
+// Picking a predefined action fills the activity text with the action's
+// label and switches that row from hours into a manually-typed price — the
+// preset only supplies the wording, never the price shown in the document.
 function setOfertaActivityPreset(i, value) {
-  _ofertaState.activities[i].presetIdx = value;
-  if (value !== '') _ofertaState.activities[i].hours = '';
+  const a = _ofertaState.activities[i];
+  a.presetIdx = value;
+  if (value !== '') {
+    a.desc  = PRESETS[Number(value)].label;
+    a.hours = '';
+  } else {
+    a.price = '';
+  }
   document.getElementById('oferta-activities').innerHTML = oferteActivitiesHtml();
   renderOfertaPreview();
 }
@@ -7487,9 +7496,8 @@ function ofertaDocHtml() {
   const bunP    = bunPartenerWordmarkHtml();
 
   const activityRows = activities.length ? activities.map((a, i) => {
-    const preset = hasPreset(a) ? PRESETS[Number(a.presetIdx)] : null;
-    const amountCell = preset
-      ? `${esc(preset.label)} — ${preset.price.toLocaleString('ro-RO')} MDL`
+    const amountCell = hasPreset(a)
+      ? (a.price !== '' ? `${esc(a.price)} MDL` : '—')
       : (a.hours !== '' ? `${esc(a.hours)} ${oreLabel(a.hours || 0)}` : '—');
     return `
     <tr>
@@ -7554,7 +7562,7 @@ function ofertaDocHtml() {
     </table>
 
     <p style="text-align:justify;margin-bottom:8px;">
-      Activitățile enunțate (adică asistența și reprezentarea juridică a intereselor clientului) vizează perioada gestionării cauzei ${causeType} (la etapa ${etapaDisplay}).
+      Activitățile enunțate (adică asistența și reprezentarea juridică a intereselor clientului) vizează perioada gestionării cauzei ${causeType} la etapa ${etapaDisplay}.
     </p>
     <p style="text-align:justify;margin-bottom:16px;">
       Luând în vedere activitățile enunțate <em>supra</em>, propunem o ofertă financiară aferentă.
