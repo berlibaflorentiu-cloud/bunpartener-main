@@ -6592,8 +6592,10 @@ async function generateAct() {
         + (onorariuTotals.EUR + cheltuieliTotals.EUR) * bnmRate
       )
     : null;
-  const firmDisplay   = firm || 'BIROUL ASOCIAT DE AVOCAȚI';
-  const coordDisplay  = coordinator || '___________';
+  const firmDisplay       = firm || 'BAA „BERLIBA și PARTENERII”';
+  const coordDisplay      = coordinator || '___________';
+  const coordinatorDisplay = coordinator || 'Viorel V. BERLIBA';
+  const bunPartenerLogoHtml = '<span style="font-weight:bold;"><span style="color:#000058;">BU</span><span style="color:#C9211E;font-style:italic;">N</span><span style="color:#000058;">Partener</span></span>';
   const clientDisplay = clientName || '___________';
   const periodDisplay = `${fmtDate(state.dateStart)} – ${fmtDate(state.dateEnd)}`;
 
@@ -6744,14 +6746,14 @@ async function generateAct() {
         <tr>
           <td style="width:50%;vertical-align:top;padding-right:20px;">
             <strong>${firmDisplay}</strong><br>
-            ${coordinator ? `BUNPartener<br>` : ''}
+            ${bunPartenerLogoHtml}<br>
             ${idno ? `IDNO: ${idno}<br>` : ''}
             ${ibanMdl ? `IBAN: ${ibanMdl} (MDL)<br>` : ''}
             ${bank ? `${bank}<br>` : ''}
             <br><br>
             __________________________________________<br>
             <span style="font-size:9pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(semnătura)</span><br>
-            ${coordinator ? `Nume, prenume: <strong>${coordinator}</strong><br>Poziția: avocat coordonator` : ''}
+            <div style="text-align:right;">Nume, prenume: <strong>${coordinatorDisplay}</strong><br>Poziția: <strong>avocat coordonator</strong></div>
           </td>
           <td style="width:50%;vertical-align:top;padding-left:20px;">
             ${clientDet ? `<strong>${clientDisplay}</strong><br>${clientDet}` : `<strong>${clientDisplay}</strong>`}
@@ -6892,7 +6894,27 @@ function downloadReport() {
     // cutting table rows and signature blocks in half. 'avoid' measures these
     // elements and pushes a whole one to the next page instead of splitting it.
     pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'img'] },
-  }).from(el).save();
+  }).from(el).toPdf().get('pdf').then(function (pdf) {
+    // Stamp the BunPartener mark in the lower-left corner of every page.
+    const pageCount  = pdf.internal.getNumberOfPages();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const x = 10, y = pageHeight - 8;
+    for (let i = 1; i <= pageCount; i++) {
+      pdf.setPage(i);
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(0, 0, 88); // #000058
+      pdf.text('BU', x, y);
+      const buW = pdf.getTextWidth('BU');
+      pdf.setFont('helvetica', 'bolditalic');
+      pdf.setTextColor(201, 33, 30); // #C9211E
+      pdf.text('N', x + buW, y);
+      const nW = pdf.getTextWidth('N');
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(0, 0, 88); // #000058
+      pdf.text('Partener', x + buW + nW, y);
+    }
+  }).save();
 }
 
 let _clientModalId = null;
