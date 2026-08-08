@@ -7289,8 +7289,9 @@ function _defaultOfertaState() {
     nrOferta: '',
     termen: '',
     causeType: 'penală',
+    etapa: '',
     clientName: '',
-    activities: [{ desc: '', hours: '' }],
+    activities: [{ desc: '', hours: '', presetIdx: '' }],
     tarif: '',
     tarifDepasire: '',
     avans: '',
@@ -7307,21 +7308,29 @@ function causeToggleHtml(current) {
 
 function oferteActivitiesHtml() {
   const s = _ofertaState;
-  const rows = s.activities.map((a, i) => `
+  const rows = s.activities.map((a, i) => {
+    const isPreset = a.presetIdx !== '' && a.presetIdx != null;
+    return `
     <div class="oferta-activity-row">
       ${s.activities.length > 1 ? `<button type="button" class="oferta-activity-remove" onclick="removeOfertaActivity(${i})" aria-label="Șterge activitatea">✕</button>` : ''}
       <div class="field">
         <label>Activitatea ${i + 1}</label>
-        <input type="text" list="oferta-presets" value="${esc(a.desc)}" placeholder="scrie sau alege o activitate predefinită" oninput="updateOfertaActivity(${i}, 'desc', this.value)">
+        <input type="text" value="${esc(a.desc)}" placeholder="ex. Examinarea materialelor cauzei" oninput="updateOfertaActivity(${i}, 'desc', this.value)">
       </div>
       <div class="field">
         <label>Ore preconizate</label>
-        <input type="number" min="0" step="0.5" value="${esc(a.hours)}" placeholder="ex. 3" oninput="updateOfertaActivity(${i}, 'hours', this.value)">
+        <input type="number" min="0" step="0.5" value="${esc(a.hours)}" placeholder="ex. 3" ${isPreset ? 'disabled' : ''} oninput="updateOfertaActivity(${i}, 'hours', this.value)">
       </div>
-    </div>`).join('');
-  return `
-    <datalist id="oferta-presets">${PRESETS.map(p => `<option value="${esc(p.label)}">`).join('')}</datalist>
-    ${rows}`;
+      <div class="field">
+        <label>...sau o acțiune predefinită (înlocuiește orele cu prețul ei fix)</label>
+        <select onchange="setOfertaActivityPreset(${i}, this.value)">
+          <option value="">— manual, în ore —</option>
+          ${PRESETS.map((p, pi) => `<option value="${pi}"${String(pi) === String(a.presetIdx) ? ' selected' : ''}>${esc(p.label)} — ${p.price.toLocaleString('ro-RO')} MDL</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+  }).join('');
+  return rows;
 }
 
 function renderOferte(container) {
@@ -7359,6 +7368,11 @@ function renderOferte(container) {
         <div id="oferta-activities">${oferteActivitiesHtml()}</div>
         <button type="button" class="btn-ghost" onclick="addOfertaActivity()">+ Adaugă activitate</button>
 
+        <div class="field">
+          <label>la etapa...</label>
+          <input type="text" value="${esc(s.etapa)}" placeholder="ex. urmăririi penale" oninput="updateOfertaField('etapa', this.value)">
+        </div>
+
         <div class="oferta-form-section-label">Onorariu</div>
         <div class="field">
           <label>Tarif (EUR/oră)</label>
@@ -7395,20 +7409,29 @@ function setOfertaCauseType(type) {
 }
 
 function addOfertaActivity() {
-  _ofertaState.activities.push({ desc: '', hours: '' });
+  _ofertaState.activities.push({ desc: '', hours: '', presetIdx: '' });
   document.getElementById('oferta-activities').innerHTML = oferteActivitiesHtml();
   renderOfertaPreview();
 }
 
 function removeOfertaActivity(i) {
   _ofertaState.activities.splice(i, 1);
-  if (!_ofertaState.activities.length) _ofertaState.activities.push({ desc: '', hours: '' });
+  if (!_ofertaState.activities.length) _ofertaState.activities.push({ desc: '', hours: '', presetIdx: '' });
   document.getElementById('oferta-activities').innerHTML = oferteActivitiesHtml();
   renderOfertaPreview();
 }
 
 function updateOfertaActivity(i, field, value) {
   _ofertaState.activities[i][field] = value;
+  renderOfertaPreview();
+}
+
+// Picking a predefined action replaces that row's hours entirely with the
+// action's own fixed price — the two are mutually exclusive, not combined.
+function setOfertaActivityPreset(i, value) {
+  _ofertaState.activities[i].presetIdx = value;
+  if (value !== '') _ofertaState.activities[i].hours = '';
+  document.getElementById('oferta-activities').innerHTML = oferteActivitiesHtml();
   renderOfertaPreview();
 }
 
@@ -7430,8 +7453,10 @@ function ofertaDocHtml() {
   const clientName = s.clientName || 'Nume';
   const causeType  = s.causeType === 'civilă' ? 'civilă' : 'penală';
 
-  const activities = s.activities.filter(a => a.desc.trim() || a.hours !== '');
-  const totalOre   = activities.reduce((sum, a) => sum + (Number(a.hours) || 0), 0);
+  const hasPreset  = a => a.presetIdx !== '' && a.presetIdx != null;
+  const activities = s.activities.filter(a => a.desc.trim() || a.hours !== '' || hasPreset(a));
+  const totalOre   = activities.reduce((sum, a) => hasPreset(a) ? sum : sum + (Number(a.hours) || 0), 0);
+  const etapaDisplay = s.etapa.trim() || '．．．．．．．．．．．．';
 
   const tarif           = Number(s.tarif) || 0;
   const totalOnorariu   = Math.round(tarif * totalOre);
@@ -7444,12 +7469,18 @@ function ofertaDocHtml() {
   const berliba = berlibaPartaneriiHtml();
   const bunP    = bunPartenerWordmarkHtml();
 
-  const activityRows = activities.length ? activities.map((a, i) => `
+  const activityRows = activities.length ? activities.map((a, i) => {
+    const preset = hasPreset(a) ? PRESETS[Number(a.presetIdx)] : null;
+    const amountCell = preset
+      ? `${esc(preset.label)} — ${preset.price.toLocaleString('ro-RO')} MDL`
+      : (a.hours !== '' ? `${esc(a.hours)} ${oreLabel(a.hours || 0)}` : '—');
+    return `
     <tr>
       <td style="border:1px solid #000;padding:6px 8px;text-align:center;width:6%;">${i + 1}.</td>
       <td style="border:1px solid #000;padding:6px 8px;font-weight:bold;">${esc(a.desc) || '—'}</td>
-      <td style="border:1px solid #000;padding:6px 8px;text-align:center;font-weight:bold;width:24%;">${a.hours !== '' ? esc(a.hours) : '—'} ${oreLabel(a.hours || 0)}</td>
-    </tr>`).join('') : `
+      <td style="border:1px solid #000;padding:6px 8px;text-align:center;font-weight:bold;width:24%;">${amountCell}</td>
+    </tr>`;
+  }).join('') : `
     <tr><td colspan="3" style="border:1px solid #000;padding:6px 8px;text-align:center;color:#777;">Nicio activitate adăugată încă</td></tr>`;
 
   return `
@@ -7466,7 +7497,7 @@ function ofertaDocHtml() {
       <tr><td style="border:1px solid #000;padding:6px 10px;font-weight:bold;width:40%;">Data emiterii ofertei</td><td style="border:1px solid #000;padding:6px 10px;text-align:center;">${todayLong}</td></tr>
       <tr><td style="border:1px solid #000;padding:6px 10px;font-weight:bold;">Termenul de acțiune a ofertei</td><td style="border:1px solid #000;padding:6px 10px;text-align:center;">${termenLong}</td></tr>
       <tr><td style="border:1px solid #000;padding:6px 10px;font-weight:bold;">Oferta se referă</td><td style="border:1px solid #000;padding:6px 10px;text-align:center;">la o propunere de asistență și consultanță juridică <strong>într-o cauză ${causeType}</strong></td></tr>
-      <tr><td style="border:1px solid #000;padding:6px 10px;font-weight:bold;">Ofertă eliberată către</td><td style="border:1px solid #000;padding:6px 10px;text-align:center;">(${esc(clientName)})</td></tr>
+      <tr><td style="border:1px solid #000;padding:6px 10px;font-weight:bold;">Ofertă eliberată către</td><td style="border:1px solid #000;padding:6px 10px;text-align:center;">${esc(clientName)}</td></tr>
       <tr><td style="border:1px solid #000;padding:6px 10px;font-weight:bold;">Emitentul ofertei</td><td style="border:1px solid #000;padding:6px 10px;text-align:center;font-weight:bold;">BAA „${berliba}”</td></tr>
     </table>
 
@@ -7476,7 +7507,7 @@ function ofertaDocHtml() {
       Vă mulțumim anticipat!
     </p>
 
-    <p style="margin-bottom:4px;"><strong>Stimate doamnă (${esc(clientName)}),</strong></p>
+    <p style="margin-bottom:4px;"><strong>Stimate doamnă ${esc(clientName)},</strong></p>
     <p style="text-align:justify;margin-bottom:8px;">
       În contextul solicitării adresate, venim cu un mesaj de mulțumire pentru interesul manifestat în raport cu Biroul asociat de avocați „${berliba}” (abreviat - ${bunP}).
     </p>
@@ -7506,7 +7537,7 @@ function ofertaDocHtml() {
     </table>
 
     <p style="text-align:justify;margin-bottom:8px;">
-      Activitățile enunțate (adică asistența și reprezentarea juridică a intereselor clientului) vizează perioada gestionării cauzei ${causeType} (la etapa ......).
+      Activitățile enunțate (adică asistența și reprezentarea juridică a intereselor clientului) vizează perioada gestionării cauzei ${causeType} (la etapa ${etapaDisplay}).
     </p>
     <p style="text-align:justify;margin-bottom:16px;">
       Luând în vedere activitățile enunțate <em>supra</em>, propunem o ofertă financiară aferentă.
