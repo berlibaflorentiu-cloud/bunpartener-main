@@ -6994,6 +6994,16 @@ const ACT_PDF_LAYOUT = Object.freeze({
   contentWidthPx: 658,
 });
 
+const ACT_PDF_SERVICE_HEADERS = Object.freeze([
+  'Nr.',
+  'Activitatea realizată',
+  'Avocatul',
+  'Nr. ore',
+  'Tarif EUR/h',
+  'Suma onorariului',
+  'Cheltuieli',
+]);
+
 async function _waitForActPdfAssets(root) {
   if (document.fonts?.ready) await document.fonts.ready;
   await Promise.all([...root.querySelectorAll('img')].map(img => {
@@ -7082,6 +7092,23 @@ async function _buildActPdfDocument(source) {
   copy.style.outline = 'none';
   copy.style.transform = 'none';
   copy.querySelectorAll('[contenteditable]').forEach(element => element.removeAttribute('contenteditable'));
+
+  // Rebuild the services-table headings specifically for the PDF clone. This
+  // also repairs older saved acts whose editable HTML may contain an empty
+  // header row, and avoids html2canvas losing the dashboard's inherited
+  // `var(--muted)` colour while cloning the document.
+  const servicesHead = copy.querySelector('.act-services-table thead');
+  const serviceHeaderCells = servicesHead ? [...servicesHead.querySelectorAll('th')] : [];
+  if (servicesHead && serviceHeaderCells.length === ACT_PDF_SERVICE_HEADERS.length) {
+    servicesHead.style.display = 'table-header-group';
+    serviceHeaderCells.forEach((cell, index) => {
+      cell.textContent = ACT_PDF_SERVICE_HEADERS[index];
+      cell.style.color = '#000000';
+      cell.style.fontWeight = '600';
+      cell.style.visibility = 'visible';
+      cell.style.opacity = '1';
+    });
+  }
   host.appendChild(copy);
   document.body.appendChild(host);
 
