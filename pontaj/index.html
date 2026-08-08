@@ -822,6 +822,10 @@
       font-size: 12px; color: var(--muted); text-transform: uppercase;
       letter-spacing: 0.1em; margin-top: 4px;
     }
+    /* .field is a column flexbox, which stretches children to its full width
+       by default — fine for inputs, wrong for a toggle that should only be
+       as wide as its two buttons. */
+    .oferta-form #oferta-cause-toggle { align-self: flex-start; }
     .oferta-static-value {
       background: var(--surface2);
       border: 1px solid var(--border);
