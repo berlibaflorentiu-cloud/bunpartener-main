@@ -16,6 +16,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"
     onerror="document.getElementById('loading-screen').style.display='none';document.getElementById('auth-screen').style.display='flex';document.getElementById('auth-screen').innerHTML='<div style=\'text-align:center;padding:60px 24px;font-family:DM Sans,sans-serif;color:#C8A96E\'><div style=\'font-size:48px;letter-spacing:0.2em;font-family:Cormorant Garamond,serif;margin-bottom:24px\'>PONTAJ</div><p style=\'color:#8B949E;font-size:14px\'>Eroare: nu s-a putut încărca librăria Supabase.<br>Verificați conexiunea la internet și reîncărcați pagina.</p><button onclick=\'location.reload()\' style=\'margin-top:20px;padding:10px 24px;background:#C8A96E;border:none;border-radius:7px;color:#0D1117;font-size:14px;font-weight:600;cursor:pointer\'>Reîncarcă</button></div>'">
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.js"
+    integrity="sha384-TtrQp5nveof/QP1+f/OLiEHL3GuOIRyl3IfsGxu5X45VO2vHeT4HRNmQuTR3Ea3w"
+    crossorigin="anonymous"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { overflow-x: hidden; }
@@ -1332,6 +1335,58 @@ try {
   showLoginScreen();
 }
 
+// The official stamp is deliberately kept out of the public site repository.
+// It lives in the existing private `bon-assets` bucket, whose SELECT policy is
+// restricted to authenticated admin/owner profiles. The image is downloaded
+// through the user's Supabase session and cached only in this browser tab.
+const ACT_STAMP_BUCKET = 'bon-assets';
+const ACT_STAMP_PATH = 'act-stamp-original.png';
+const ACT_STAMP_WIDTH_MM = 44.415;
+const ACT_STAMP_HEIGHT_MM = 43.568;
+let _actStampDataUrlPromise = null;
+
+function _blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error('Imaginea ștampilei nu a putut fi citită.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function getActStampDataUrl() {
+  if (!_actStampDataUrlPromise) {
+    _actStampDataUrlPromise = (async () => {
+      const { data, error } = await db.storage.from(ACT_STAMP_BUCKET).download(ACT_STAMP_PATH);
+      if (error || !data) throw error || new Error('Ștampila nu este disponibilă.');
+      const pngBlob = data.type === 'image/png' ? data : new Blob([data], { type: 'image/png' });
+      return _blobToDataUrl(pngBlob);
+    })().catch(error => {
+      _actStampDataUrlPromise = null;
+      throw error;
+    });
+  }
+  return _actStampDataUrlPromise;
+}
+
+async function hydrateActPrivateAssets(root) {
+  if (!root) return;
+  const stamps = [...root.querySelectorAll(`[data-private-storage-path="${ACT_STAMP_PATH}"]`)];
+  if (!stamps.length) return;
+  const dataUrl = await getActStampDataUrl();
+  stamps.forEach(img => { img.src = dataUrl; });
+  await Promise.all(stamps.map(img => typeof img.decode === 'function' ? img.decode().catch(() => {}) : Promise.resolve()));
+}
+
+function serializedActHtml(root, fallbackHtml = '') {
+  if (!root) return fallbackHtml;
+  const copy = root.cloneNode(true);
+  // Never persist a private image's bytes or a temporary access URL in a
+  // report row. Reopening/exporting rehydrates this marker from Storage.
+  copy.querySelectorAll('[data-private-storage-path]').forEach(img => img.removeAttribute('src'));
+  return copy.outerHTML;
+}
+
 // ═══════════════════════════════════════
 // GLOBAL STATE
 // ═══════════════════════════════════════
@@ -1465,6 +1520,7 @@ async function logout() {
   if (currentUser?.id) localStorage.removeItem('pontaj_admin_tabs_' + currentUser.id);
   await db.auth.signOut();
   currentUser = null; allUsers = []; allEntries = [];
+  _actStampDataUrlPromise = null;
   allAvansuri = [];
   allImpozite = [];
   adminTabPreferences = { order: [], hidden: [], lawyerView: 'cards' };
@@ -6483,6 +6539,14 @@ async function generateAct() {
   const contractNr   = fs.contractNr;
   const contractDate = fs.contractDate;
 
+  let actStampDataUrl;
+  try {
+    actStampDataUrl = await getActStampDataUrl();
+  } catch (error) {
+    alert('Actul nu poate fi generat fără ștampila oficială: ' + error.message);
+    return;
+  }
+
   const settings = { firm, coordinator, idno, ibanMdl, bank,
                      lastContractNr: contractNr, lastContractDate: contractDate,
                      lastClient: clientName };
@@ -6748,20 +6812,29 @@ async function generateAct() {
       <p style="margin-bottom:12px;text-align:justify;"><strong>3. EXECUTORUL</strong> își asumă obligația${contractNr ? `, conform contractului de asistență juridică nr. ${contractNr} din ${contractDateFmt},` : ''} să asigure în continuare asistența și reprezentarea juridică a intereselor CLIENTULUI.</p>
       <p style="margin-bottom:28px;text-align:justify;"><strong>4.</strong> Prezentul act de predare-primire a lucrărilor executate intră în vigoare din momentul semnării.</p>
 
-      <table style="width:100%;border-collapse:collapse;font-size:10pt;">
+      <table class="act-signature-table" style="width:100%;border-collapse:collapse;font-size:10pt;">
         <tr>
-          <td style="width:50%;vertical-align:top;padding-right:20px;">
+          <td style="width:50%;vertical-align:top;padding-right:20px;border:0;">
             <strong>${firmDisplay}</strong><br>
             ${bunPartenerLogoHtml}<br>
             ${idno ? `IDNO: ${idno}<br>` : ''}
             ${ibanMdl ? `IBAN: ${ibanMdl} (MDL)<br>` : ''}
             ${bank ? `${bank}<br>` : ''}
-            <br><br>
-            __________________________________________<br>
-            <span style="font-size:9pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(semnătura)</span><br>
+            <div class="act-firm-signature" style="height:${ACT_STAMP_HEIGHT_MM}mm;margin-top:3mm;">
+              <img
+                class="act-stamp-img"
+                data-private-storage-path="${ACT_STAMP_PATH}"
+                src="${actStampDataUrl}"
+                width="168" height="165"
+                alt="Ștampila BAA Berliba și Partenerii"
+                style="display:block;margin-left:1.5mm;width:${ACT_STAMP_WIDTH_MM}mm;height:${ACT_STAMP_HEIGHT_MM}mm;max-width:none;object-fit:fill;"
+              >
+            </div>
+            <div style="border-bottom:1px solid #000;"></div>
+            <div style="text-align:center;font-size:9pt;">(semnătura)</div>
             <div style="text-align:right;">Nume, prenume: <strong>${coordinatorDisplay}</strong><br>Poziția: <strong>avocat coordonator</strong></div>
           </td>
-          <td style="width:50%;vertical-align:top;padding-left:20px;">
+          <td style="width:50%;vertical-align:top;padding-left:20px;border:0;">
             ${clientDet ? `<strong>${clientDisplay}</strong><br>${clientDet}` : `<strong>${clientDisplay}</strong>`}
             <br><br>
             __________________________________________<br>
@@ -6809,7 +6882,7 @@ async function saveActToClient() {
   const d = fs.saveData;
   // Read the live document rather than the pre-generation snapshot, so any
   // manual edits made in the editable act view are captured too.
-  const liveHtml = document.getElementById('act-document')?.outerHTML || d.documentHtml;
+  const liveHtml = serializedActHtml(document.getElementById('act-document'), d.documentHtml);
   const { data, error } = await db.from('client_reports').insert([{
     client_name: d.clientName,
     contract_nr: d.contractNr || null,
@@ -6844,6 +6917,12 @@ async function saveActToClient() {
 async function downloadDocx() {
   const el = document.getElementById('act-document');
   if (!el) return;
+  try {
+    await hydrateActPrivateAssets(el);
+  } catch (error) {
+    alert('Documentul Word nu poate fi generat fără ștampila oficială: ' + error.message);
+    return;
+  }
   const settings = JSON.parse(localStorage.getItem('pontaj_settings') || '{}');
   const slug = (settings.lastClient || 'client').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
   const date = new Date().toISOString().split('T')[0];
@@ -6851,19 +6930,31 @@ async function downloadDocx() {
   const clone = el.cloneNode(true);
   clone.removeAttribute('contenteditable');
   clone.removeAttribute('spellcheck');
-  // Word doesn't render data: URIs — swap to hosted URL so it loads correctly
-  const cloneLogo = clone.querySelector('img');
+  // The DOCX converter embeds data: images into the package. Bake each
+  // rendered size into HTML attributes as well because Word does not always
+  // honor CSS-only image dimensions during its first import pass.
+  const cloneLogo = clone.querySelector('img:not([data-private-storage-path])');
   if (cloneLogo) {
-    // Word's HTML import ignores CSS width/height on <img> and falls back to the
-    // source file's native pixel size — bake the rendered size in as HTML attributes.
     const liveLogo = el.querySelector('img');
     const h = liveLogo?.clientHeight || 72;
     const w = liveLogo?.clientWidth || h;
-    cloneLogo.src = 'https://bunpartener.md/pontaj/BU_logo_highres_white_background.png';
     cloneLogo.setAttribute('width', w);
     cloneLogo.setAttribute('height', h);
     cloneLogo.style.width = w + 'px';
     cloneLogo.style.height = h + 'px';
+  }
+
+  const cloneStamp = clone.querySelector(`[data-private-storage-path="${ACT_STAMP_PATH}"]`);
+  if (cloneStamp) {
+    const match = cloneStamp.src.match(/^data:([^;,]+);base64,(.+)$/);
+    if (!match) {
+      alert('Ștampila nu a putut fi inclusă în documentul Word.');
+      return;
+    }
+    cloneStamp.setAttribute('width', '168');
+    cloneStamp.setAttribute('height', '165');
+    cloneStamp.style.width = `${ACT_STAMP_WIDTH_MM}mm`;
+    cloneStamp.style.height = `${ACT_STAMP_HEIGHT_MM}mm`;
   }
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -6878,8 +6969,15 @@ async function downloadDocx() {
     tr { page-break-inside: avoid; break-inside: avoid; }
   </style></head><body>${clone.outerHTML}</body></html>`;
 
-  const docBlob = new Blob(['﻿', html], { type: 'application/msword' });
-  saveAs(docBlob, `act-predare-primire-${slug}-${date}.doc`);
+  if (!window.htmlDocx?.asBlob) {
+    alert('Generatorul Word nu este disponibil. Reîmprospătați pagina și încercați din nou.');
+    return;
+  }
+  // Generate a real DOCX package. html-docx-js embeds every base64 image into
+  // its internal MHT part, so the private stamp remains inside the downloaded
+  // file and no Supabase URL or access token is written into the document.
+  const docBlob = window.htmlDocx.asBlob(html);
+  saveAs(docBlob, `act-predare-primire-${slug}-${date}.docx`);
 }
 
 const ACT_PDF_LAYOUT = Object.freeze({
@@ -7050,6 +7148,7 @@ async function downloadReport() {
   const slug     = (settings.lastClient || 'client').toLowerCase()
                      .replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
   try {
+    await hydrateActPrivateAssets(el);
     const pdf = await _buildActPdfDocument(el);
     pdf.save(`act-predare-primire-${slug}-${date}.pdf`);
   } catch (error) {
@@ -7209,7 +7308,13 @@ function viewSavedReport(id) {
     ${r.document_html}
   `;
   const reopenedDoc = document.getElementById('act-document');
-  if (reopenedDoc) { reopenedDoc.contentEditable = 'true'; reopenedDoc.spellcheck = false; }
+  if (reopenedDoc) {
+    reopenedDoc.contentEditable = 'true';
+    reopenedDoc.spellcheck = false;
+    hydrateActPrivateAssets(reopenedDoc).catch(error => {
+      alert('Ștampila oficială nu a putut fi încărcată: ' + error.message);
+    });
+  }
   document.getElementById('modal-overlay').style.display = 'flex';
 }
 
@@ -7283,6 +7388,7 @@ if (db) {
     if (session) {
       await loadAll();
     } else {
+      _actStampDataUrlPromise = null;
       showLoginScreen();
     }
   });
